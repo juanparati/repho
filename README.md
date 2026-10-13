@@ -1,6 +1,6 @@
 # Rephó
 
-A lightweight repository manager and proxy for [Composer](https://getcomposer.org/).
+A lightweight repository manager and proxy for [Composer](https://getcomposer.org/) and [npm](https://www.npmjs.com/).
 
 ![Screenshot](resources/img/screenshot.png)
 
@@ -21,8 +21,9 @@ A lightweight repository manager and proxy for [Composer](https://getcomposer.or
 - Simple to use.
 - Doesn't require any RDMS, it can work only with a sqlite file.
 - Ideal for small projects and/or small teams.
-- Optional composer proxy.
-- Security audit provided by [Packagist API](https://packagist.org/security-advisories/).
+- Serves private npm packages built from Git tags (works with npm, pnpm, Yarn and Bun). No `npm publish` needed, no Node.js on the server.
+- Optional Composer and npm proxies.
+- Security audit provided by [Packagist API](https://packagist.org/security-advisories/) and the npm registry's advisories endpoint.
 - It can keep copies of packages in a local directory.
 - Slack and email notifications for security alerts.
 - Lightweight, you can host it on a Raspberry Pi or the cheaper Laravel Cloud instance.

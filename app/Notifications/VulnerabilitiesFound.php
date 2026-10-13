@@ -10,7 +10,7 @@ use Illuminate\Notifications\Slack\SlackMessage;
 class VulnerabilitiesFound extends Notification
 {
     /**
-     * @param  array<string, array<int, array{advisoryId: string, title: string, link: string, cve: string|null, affectedVersions: string, reportedAt: string, severity: string|null}>>  $vulnerabilities
+     * @param  array<string, array<int, array{advisoryId: string, title: string, link: string, cve: string|null, affectedVersions: string, reportedAt: string|null, severity: string|null}>>  $vulnerabilities
      */
     public function __construct(
         public array $vulnerabilities,

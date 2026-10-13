@@ -37,7 +37,7 @@ class AuthenticateRepository
         }
 
         return response()->json(['error' => 'Invalid credentials.'], 401, [
-            'WWW-Authenticate' => 'Basic realm="Composer Repository"',
+            'WWW-Authenticate' => 'Basic realm="Repho Repository"',
         ]);
     }
 

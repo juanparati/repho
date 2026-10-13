@@ -58,6 +58,25 @@ export default function UpstreamsEdit({ upstream }: PageProps) {
                             </label>
 
                             <div className="grid gap-2">
+                                <Label htmlFor="ecosystem">Ecosystem</Label>
+                                <Select
+                                    name="ecosystem"
+                                    defaultValue={upstream.ecosystem}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="composer">
+                                            Composer
+                                        </SelectItem>
+                                        <SelectItem value="npm">npm</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <InputError message={errors.ecosystem} />
+                            </div>
+
+                            <div className="grid gap-2">
                                 <Label htmlFor="name">Name</Label>
                                 <Input
                                     id="name"
@@ -97,7 +116,9 @@ export default function UpstreamsEdit({ upstream }: PageProps) {
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="auth_type">Authentication</Label>
+                                <Label htmlFor="auth_type">
+                                    Authentication
+                                </Label>
                                 <Select
                                     name="auth_type"
                                     defaultValue={upstream.auth_type}

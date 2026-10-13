@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\Ecosystem;
 use App\Enums\PackageType;
 use App\Models\Credential;
 use App\Models\Package;
@@ -11,7 +12,7 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
-#[Signature('package:add {url : Repository URL} {--type= : Source type (github, gitlab, git)} {--credential= : Credential name or ID} {--repo=* : Repository slug(s) to add the package to}')]
+#[Signature('package:add {url : Repository URL} {--type= : Source type (github, gitlab, git)} {--ecosystem=composer : Package ecosystem (composer, npm)} {--name= : Package name, required for npm (as declared in package.json)} {--credential= : Credential name or ID} {--repo=* : Repository slug(s) to add the package to}')]
 #[Description('Add a new package from a repository URL')]
 class AddPackage extends Command
 {
@@ -26,10 +27,27 @@ class AddPackage extends Command
             return self::FAILURE;
         }
 
+        $ecosystem = Ecosystem::tryFrom((string) $this->option('ecosystem'));
+
+        if (! $ecosystem) {
+            $this->error('Unknown ecosystem. Use --ecosystem=composer or --ecosystem=npm.');
+
+            return self::FAILURE;
+        }
+
+        $name = $ecosystem === Ecosystem::Npm ? (string) $this->option('name') : $this->guessPackageName($url);
+
+        if ($ecosystem === Ecosystem::Npm && preg_match('/^'.Package::NPM_NAME_PATTERN.'$/', $name) !== 1) {
+            $this->error('npm packages need a valid --name, e.g. --name=@scope/package.');
+
+            return self::FAILURE;
+        }
+
         $credential = $this->resolveCredential();
 
         $package = Package::create([
-            'name' => $this->guessPackageName($url),
+            'name' => $name,
+            'ecosystem' => $ecosystem,
             'repository_url' => $url,
             'type' => $type,
             'credential_id' => $credential?->id,
@@ -50,9 +68,6 @@ class AddPackage extends Command
             $synchronizer->sync($package);
 
             $package->refresh();
-            if ($package->name !== $this->guessPackageName($url)) {
-                $this->info("Package name updated to: {$package->name}");
-            }
 
             $versionCount = $package->versions()->count();
             $this->info("Synced successfully. {$versionCount} version(s) found.");

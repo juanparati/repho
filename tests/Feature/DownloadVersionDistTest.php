@@ -32,7 +32,7 @@ class DownloadVersionDistTest extends TestCase
         });
 
         $job = new DownloadVersionDist($version);
-        $job->handle();
+        app()->call([$job, 'handle']);
 
         $this->assertFileExists($cachePath);
         $this->assertSame('fake-zip-content', file_get_contents($cachePath));
@@ -59,7 +59,7 @@ class DownloadVersionDistTest extends TestCase
         });
 
         $job = new DownloadVersionDist($version);
-        $job->handle();
+        app()->call([$job, 'handle']);
 
         $this->assertSame('already-cached', file_get_contents($cachePath));
 
@@ -79,7 +79,7 @@ class DownloadVersionDistTest extends TestCase
         });
 
         $job = new DownloadVersionDist($version);
-        $job->handle();
+        app()->call([$job, 'handle']);
 
         $cachePath = config('repho.dist_cache_path').'/vendor/pkg/nullref.zip';
         $this->assertFileDoesNotExist($cachePath);
@@ -97,14 +97,14 @@ class DownloadVersionDistTest extends TestCase
                         'version' => 'v1.0.0',
                         'version_normalized' => '1.0.0.0',
                         'reference' => 'ref1',
-                        'composer_json' => ['name' => 'vendor/pkg'],
+                        'manifest' => ['name' => 'vendor/pkg'],
                         'released_at' => '2026-01-01 00:00:00',
                     ],
                     [
                         'version' => 'v2.0.0',
                         'version_normalized' => '2.0.0.0',
                         'reference' => 'ref2',
-                        'composer_json' => ['name' => 'vendor/pkg'],
+                        'manifest' => ['name' => 'vendor/pkg'],
                         'released_at' => '2026-02-01 00:00:00',
                     ],
                 ]);
@@ -130,7 +130,7 @@ class DownloadVersionDistTest extends TestCase
                         'version' => 'v1.0.0',
                         'version_normalized' => '1.0.0.0',
                         'reference' => 'ref1',
-                        'composer_json' => ['name' => 'vendor/pkg'],
+                        'manifest' => ['name' => 'vendor/pkg'],
                         'released_at' => '2026-01-01 00:00:00',
                     ],
                 ]);
@@ -160,14 +160,14 @@ class DownloadVersionDistTest extends TestCase
                         'version' => 'v1.0.0',
                         'version_normalized' => '1.0.0.0',
                         'reference' => 'existing-ref',
-                        'composer_json' => ['name' => 'vendor/pkg'],
+                        'manifest' => ['name' => 'vendor/pkg'],
                         'released_at' => '2026-01-01 00:00:00',
                     ],
                     [
                         'version' => 'v2.0.0',
                         'version_normalized' => '2.0.0.0',
                         'reference' => 'new-ref',
-                        'composer_json' => ['name' => 'vendor/pkg'],
+                        'manifest' => ['name' => 'vendor/pkg'],
                         'released_at' => '2026-02-01 00:00:00',
                     ],
                 ]);
@@ -205,7 +205,7 @@ class DownloadVersionDistTest extends TestCase
                         'version' => 'v2.0.0',
                         'version_normalized' => '2.0.0.0',
                         'reference' => 'new-ref',
-                        'composer_json' => ['name' => 'vendor/cleanup'],
+                        'manifest' => ['name' => 'vendor/cleanup'],
                         'released_at' => '2026-02-01 00:00:00',
                     ],
                 ]);

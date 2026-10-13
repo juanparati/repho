@@ -17,7 +17,8 @@ class ProxySettingFactory extends Factory
     public function definition(): array
     {
         return [
-            'enabled' => false,
+            'composer_enabled' => false,
+            'npm_enabled' => false,
             'auth_type' => RepositoryAuthType::None,
             'auth_username' => null,
             'auth_password' => null,
@@ -26,17 +27,36 @@ class ProxySettingFactory extends Factory
         ];
     }
 
+    /**
+     * Enable the proxy for every ecosystem.
+     */
     public function enabled(): static
     {
         return $this->state([
-            'enabled' => true,
+            'composer_enabled' => true,
+            'npm_enabled' => true,
         ]);
     }
 
     public function disabled(): static
     {
         return $this->state([
-            'enabled' => false,
+            'composer_enabled' => false,
+            'npm_enabled' => false,
+        ]);
+    }
+
+    public function composerEnabled(): static
+    {
+        return $this->state([
+            'composer_enabled' => true,
+        ]);
+    }
+
+    public function npmEnabled(): static
+    {
+        return $this->state([
+            'npm_enabled' => true,
         ]);
     }
 

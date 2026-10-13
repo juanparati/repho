@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\Ecosystem;
 use App\Enums\RepositoryAuthType;
 use App\Models\ProxySetting;
 use Closure;
@@ -10,11 +11,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AuthenticateProxy
 {
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, string $ecosystem = 'composer'): Response
     {
         $settings = ProxySetting::instance();
 
-        if (! $settings->isEnabled()) {
+        if (! $settings->isEnabled(Ecosystem::from($ecosystem))) {
             abort(404);
         }
 
@@ -37,7 +38,7 @@ class AuthenticateProxy
         }
 
         return response()->json(['error' => 'Invalid credentials.'], 401, [
-            'WWW-Authenticate' => 'Basic realm="Composer Proxy"',
+            'WWW-Authenticate' => 'Basic realm="Repho Proxy"',
         ]);
     }
 

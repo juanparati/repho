@@ -61,11 +61,17 @@ class RepositoryController extends Controller
                 ->map(fn (Package $pkg) => [
                     'id' => $pkg->id,
                     'name' => $pkg->name,
+                    'ecosystem' => $pkg->ecosystem->value,
                     'versions_count' => $pkg->versions_count,
                 ]),
             'availablePackages' => Package::query()
                 ->whereDoesntHave('repositories', fn ($q) => $q->where('repositories.id', $repository->id))
-                ->get(['id', 'name']),
+                ->get(['id', 'name', 'ecosystem'])
+                ->map(fn (Package $pkg) => [
+                    'id' => $pkg->id,
+                    'name' => $pkg->name,
+                    'ecosystem' => $pkg->ecosystem->value,
+                ]),
         ]);
     }
 

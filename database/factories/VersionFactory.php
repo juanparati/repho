@@ -26,7 +26,9 @@ class VersionFactory extends Factory
             'version' => $version,
             'version_normalized' => "$version.0",
             'reference' => fake()->sha1(),
-            'composer_json' => [
+            'shasum' => null,
+            'integrity' => null,
+            'manifest' => [
                 'name' => 'vendor/package',
                 'description' => fake()->sentence(),
                 'type' => 'library',
@@ -44,6 +46,28 @@ class VersionFactory extends Factory
             'version' => 'dev-main',
             'version_normalized' => 'dev-main',
             'released_at' => now(),
+        ]);
+    }
+
+    /**
+     * An npm version: semver without the Composer ".0" suffix, a package.json
+     * manifest and a built tarball's hashes.
+     */
+    public function npm(string $version = '1.0.0', string $name = '@vendor/package'): static
+    {
+        return $this->state([
+            'version' => $version,
+            'version_normalized' => $version,
+            'shasum' => fake()->sha1(),
+            'integrity' => 'sha512-'.base64_encode(random_bytes(64)),
+            'manifest' => [
+                'name' => $name,
+                'version' => $version,
+                'description' => fake()->sentence(),
+                'main' => 'index.js',
+                'license' => 'MIT',
+                'dependencies' => ['lodash' => '^4.17.21'],
+            ],
         ]);
     }
 }

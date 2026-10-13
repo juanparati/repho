@@ -15,7 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import type { Credential, Repository } from '@/types/package';
+import type { Credential, Ecosystem, Repository } from '@/types/package';
 
 type PageProps = {
     credentials: Credential[];
@@ -27,6 +27,7 @@ export default function PackagesCreate({
     repositories,
 }: PageProps) {
     const [selectedRepoIds, setSelectedRepoIds] = useState<number[]>([]);
+    const [ecosystem, setEcosystem] = useState<Ecosystem>('composer');
 
     const availableRepos = repositories.filter(
         (r) => !selectedRepoIds.includes(r.id),
@@ -54,6 +55,46 @@ export default function PackagesCreate({
                     {({ errors, processing }) => (
                         <>
                             <div className="grid gap-2">
+                                <Label htmlFor="ecosystem">Ecosystem</Label>
+                                <Select
+                                    name="ecosystem"
+                                    defaultValue="composer"
+                                    onValueChange={(value) =>
+                                        setEcosystem(value as Ecosystem)
+                                    }
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="composer">
+                                            Composer
+                                        </SelectItem>
+                                        <SelectItem value="npm">npm</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <InputError message={errors.ecosystem} />
+                            </div>
+
+                            {ecosystem === 'npm' && (
+                                <div className="grid gap-2">
+                                    <Label htmlFor="name">Package name</Label>
+                                    <Input
+                                        id="name"
+                                        name="name"
+                                        placeholder="@scope/package"
+                                        required
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Must match the <code>name</code> in the
+                                        repository&apos;s package.json. The
+                                        first sync fails if it differs.
+                                    </p>
+                                    <InputError message={errors.name} />
+                                </div>
+                            )}
+
+                            <div className="grid gap-2">
                                 <Label htmlFor="repository_url">
                                     Repository URL
                                 </Label>
@@ -80,9 +121,7 @@ export default function PackagesCreate({
                                         <SelectItem value="gitlab">
                                             GitLab
                                         </SelectItem>
-                                        <SelectItem value="git">
-                                            Git
-                                        </SelectItem>
+                                        <SelectItem value="git">Git</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <InputError message={errors.type} />
@@ -118,7 +157,11 @@ export default function PackagesCreate({
                                             const repo = repositories.find(
                                                 (r) => r.id === id,
                                             );
-                                            if (!repo) return null;
+
+                                            if (!repo) {
+                                                return null;
+                                            }
+
                                             return (
                                                 <Badge
                                                     key={id}
@@ -171,20 +214,23 @@ export default function PackagesCreate({
                                         value={id}
                                     />
                                 ))}
-                                <InputError
-                                    message={errors.repository_ids}
-                                />
+                                <InputError message={errors.repository_ids} />
                             </div>
 
-                            <label className="flex items-center gap-2">
-                                <Checkbox
-                                    name="download_dists"
-                                    value="1"
-                                />
-                                <span className="text-sm">
-                                    Download dist archives on sync
-                                </span>
-                            </label>
+                            {ecosystem === 'composer' ? (
+                                <label className="flex items-center gap-2">
+                                    <Checkbox name="download_dists" value="1" />
+                                    <span className="text-sm">
+                                        Download dist archives on sync
+                                    </span>
+                                </label>
+                            ) : (
+                                <p className="text-xs text-muted-foreground">
+                                    npm tarballs are always built and stored on
+                                    sync, so their integrity hash can be
+                                    published.
+                                </p>
+                            )}
 
                             <Button type="submit" disabled={processing}>
                                 {processing

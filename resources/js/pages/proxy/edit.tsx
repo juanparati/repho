@@ -1,6 +1,6 @@
 import { Form, Head, Link, router, usePage } from '@inertiajs/react';
-import { useState } from 'react';
 import { BookOpen, Copy, Globe, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { ECOSYSTEM_LABELS } from '@/types/package';
 import type { ProxySetting, ProxyUpstream } from '@/types/package';
 
 type PageProps = {
@@ -31,7 +32,10 @@ type PageProps = {
 };
 
 export default function ProxyEdit({ settings, upstreams }: PageProps) {
-    const [enabled, setEnabled] = useState(settings.enabled);
+    const [composerEnabled, setComposerEnabled] = useState(
+        settings.composer_enabled,
+    );
+    const [npmEnabled, setNpmEnabled] = useState(settings.npm_enabled);
     const [authType, setAuthType] = useState(settings.auth_type);
     const { appUrl } = usePage<{ appUrl: string }>().props;
     const proxyUrl = `${appUrl.replace(/\/+$/, '')}/proxy`;
@@ -44,7 +48,7 @@ export default function ProxyEdit({ settings, upstreams }: PageProps) {
                 <div className="flex items-center justify-between">
                     <Heading
                         title="Proxy Settings"
-                        description="Configure the Composer proxy to cache upstream packages for offline use."
+                        description="Configure the Composer and npm proxies to cache upstream packages for offline use."
                     />
                     <ProxyInstructionsDialog
                         proxyUrl={proxyUrl}
@@ -57,21 +61,46 @@ export default function ProxyEdit({ settings, upstreams }: PageProps) {
                         <>
                             <input
                                 type="hidden"
-                                name="enabled"
-                                value={enabled ? '1' : '0'}
+                                name="composer_enabled"
+                                value={composerEnabled ? '1' : '0'}
                             />
-                            <label className="flex items-center gap-2">
-                                <Checkbox
-                                    checked={enabled}
-                                    onCheckedChange={(checked) =>
-                                        setEnabled(checked === true)
-                                    }
-                                />
-                                <span className="text-sm font-medium">
-                                    Enable proxy
-                                </span>
-                            </label>
-                            <InputError message={errors.enabled} />
+                            <input
+                                type="hidden"
+                                name="npm_enabled"
+                                value={npmEnabled ? '1' : '0'}
+                            />
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2">
+                                    <Checkbox
+                                        checked={composerEnabled}
+                                        onCheckedChange={(checked) =>
+                                            setComposerEnabled(checked === true)
+                                        }
+                                    />
+                                    <span className="text-sm font-medium">
+                                        Enable Composer proxy
+                                    </span>
+                                    <code className="text-xs text-muted-foreground">
+                                        /proxy
+                                    </code>
+                                </label>
+                                <InputError message={errors.composer_enabled} />
+                                <label className="flex items-center gap-2">
+                                    <Checkbox
+                                        checked={npmEnabled}
+                                        onCheckedChange={(checked) =>
+                                            setNpmEnabled(checked === true)
+                                        }
+                                    />
+                                    <span className="text-sm font-medium">
+                                        Enable npm proxy
+                                    </span>
+                                    <code className="text-xs text-muted-foreground">
+                                        /proxy/npm
+                                    </code>
+                                </label>
+                                <InputError message={errors.npm_enabled} />
+                            </div>
 
                             <div className="grid gap-2">
                                 <Label htmlFor="metadata_cache_ttl">
@@ -95,8 +124,8 @@ export default function ProxyEdit({ settings, upstreams }: PageProps) {
                                     Client Authentication
                                 </legend>
                                 <p className="text-xs text-muted-foreground">
-                                    How Composer clients authenticate to this
-                                    proxy.
+                                    How Composer and npm clients authenticate to
+                                    this proxy.
                                 </p>
 
                                 <div className="grid gap-2">
@@ -189,7 +218,7 @@ export default function ProxyEdit({ settings, upstreams }: PageProps) {
                 <div className="space-y-4 pt-4">
                     <Heading
                         title="Upstreams"
-                        description="Upstream Composer repositories to proxy. First match wins by priority order."
+                        description="Upstream Composer repositories and npm registries to proxy. Within an ecosystem, first match wins by priority order."
                         variant="small"
                     />
                     <Button asChild size="sm">
@@ -219,6 +248,9 @@ export default function ProxyEdit({ settings, upstreams }: PageProps) {
                                             Name
                                         </th>
                                         <th className="px-4 py-3 text-left font-medium">
+                                            Ecosystem
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
                                             URL
                                         </th>
                                         <th className="px-4 py-3 text-left font-medium">
@@ -243,6 +275,15 @@ export default function ProxyEdit({ settings, upstreams }: PageProps) {
                                         >
                                             <td className="px-4 py-3 font-medium">
                                                 {upstream.name}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <Badge variant="outline">
+                                                    {
+                                                        ECOSYSTEM_LABELS[
+                                                            upstream.ecosystem
+                                                        ]
+                                                    }
+                                                </Badge>
                                             </td>
                                             <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                                                 {upstream.upstream_url}
@@ -328,6 +369,22 @@ function ProxyInstructionsDialog({
 
     const composerCliCommand = `composer config repositories.proxy composer ${proxyUrl}`;
     const host = new URL(proxyUrl).host;
+    const npmRegistryUrl = `${proxyUrl}/npm/`;
+    const npmrcAuthKey = `//${host}${new URL(npmRegistryUrl).pathname}`;
+    const npmrcLines = [`registry=${npmRegistryUrl}`];
+
+    if (authType === 'basic') {
+        npmrcLines.push(
+            `${npmrcAuthKey}:username=your-username`,
+            `${npmrcAuthKey}:_password=BASE64_OF_YOUR_PASSWORD`,
+        );
+    }
+
+    if (authType === 'token') {
+        npmrcLines.push(`${npmrcAuthKey}:_authToken=your-token`);
+    }
+
+    const npmrc = npmrcLines.join('\n');
 
     return (
         <Dialog>
@@ -341,10 +398,11 @@ function ProxyInstructionsDialog({
                 <DialogHeader>
                     <DialogTitle>Proxy Setup Instructions</DialogTitle>
                     <DialogDescription>
-                        Configure Composer to use this proxy.
+                        Configure Composer or npm to use this proxy.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-5">
+                <div className="max-h-[70vh] space-y-5 overflow-y-auto pr-1">
+                    <h3 className="text-base font-semibold">Composer</h3>
                     <section className="space-y-2">
                         <h4 className="text-sm font-medium">
                             1. Add to composer.json
@@ -391,6 +449,25 @@ function ProxyInstructionsDialog({
                         </h4>
                         <CodeBlock code={`${proxyUrl}/packages.json`} />
                     </section>
+
+                    <h3 className="text-base font-semibold">npm</h3>
+                    <section className="space-y-2">
+                        <h4 className="text-sm font-medium">
+                            Add to your project&apos;s .npmrc
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                            Works with npm, pnpm, Bun and Yarn Classic. Yarn
+                            Berry reads <code>npmRegistryServer</code> in
+                            .yarnrc.yml instead.
+                        </p>
+                        <CodeBlock code={npmrc} />
+                    </section>
+                    <section className="space-y-2">
+                        <h4 className="text-sm font-medium">Or use the CLI</h4>
+                        <CodeBlock
+                            code={`npm config set registry ${npmRegistryUrl}`}
+                        />
+                    </section>
                 </div>
             </DialogContent>
         </Dialog>
@@ -414,7 +491,7 @@ function CodeBlock({ code }: { code: string }) {
             <Button
                 variant="outline"
                 size="sm"
-                className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100"
+                className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
                 onClick={handleCopy}
             >
                 {copied ? 'Copied!' : <Copy className="size-3" />}
@@ -430,6 +507,7 @@ function AuthBadge({ type }: { type: ProxyUpstream['auth_type'] }) {
         token: { label: 'Token', variant: 'default' as const },
     };
     const { label, variant } = config[type];
+
     return <Badge variant={variant}>{label}</Badge>;
 }
 

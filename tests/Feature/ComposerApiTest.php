@@ -72,7 +72,7 @@ class ComposerApiTest extends TestCase
             'version' => '1.0.0',
             'version_normalized' => '1.0.0.0',
             'reference' => 'abc123def456',
-            'composer_json' => [
+            'manifest' => [
                 'name' => 'vendor/test-lib',
                 'description' => 'A test library',
                 'require' => ['php' => '>=8.1'],

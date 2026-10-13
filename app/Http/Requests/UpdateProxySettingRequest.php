@@ -19,7 +19,8 @@ class UpdateProxySettingRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'enabled' => ['required', 'boolean'],
+            'composer_enabled' => ['required', 'boolean'],
+            'npm_enabled' => ['required', 'boolean'],
             'auth_type' => ['required', Rule::enum(RepositoryAuthType::class)],
             'auth_username' => ['nullable', 'required_if:auth_type,basic', 'string', 'max:255'],
             'auth_password' => ['nullable', 'required_if:auth_type,basic', 'string', 'max:255'],

@@ -72,7 +72,7 @@ class MetadataBuilderTest extends TestCase
             'version' => '1.0.0',
             'version_normalized' => '1.0.0.0',
             'reference' => 'abc123',
-            'composer_json' => [
+            'manifest' => [
                 'name' => 'vendor/test',
                 'require' => ['php' => '>=8.1'],
             ],
@@ -99,7 +99,7 @@ class MetadataBuilderTest extends TestCase
             'version' => '2.0.0',
             'version_normalized' => '2.0.0.0',
             'reference' => 'def456',
-            'composer_json' => [
+            'manifest' => [
                 'name' => 'vendor/test',
                 'require' => ['php' => '>=8.2'],
             ],

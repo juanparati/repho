@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ECOSYSTEM_LABELS } from '@/types/package';
 import type { Package } from '@/types/package';
 
 type PageProps = {
@@ -42,8 +43,8 @@ export default function PackagesIndex({ packages }: PageProps) {
             {anySyncing && (
                 <SyncOverlay
                     progress={
-                        packages.find((pkg) => pkg.is_syncing)
-                            ?.sync_progress ?? 0
+                        packages.find((pkg) => pkg.is_syncing)?.sync_progress ??
+                        0
                     }
                 />
             )}
@@ -52,7 +53,7 @@ export default function PackagesIndex({ packages }: PageProps) {
                 <div className="flex items-center justify-between">
                     <Heading
                         title="Packages"
-                        description="Manage your Composer packages"
+                        description="Manage your Composer and npm packages"
                     />
                     <Button asChild>
                         <Link href="/packages/create">
@@ -83,6 +84,9 @@ export default function PackagesIndex({ packages }: PageProps) {
                                 <tr className="border-b bg-muted/50">
                                     <th className="px-4 py-3 text-left font-medium">
                                         Package
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Ecosystem
                                     </th>
                                     <th className="px-4 py-3 text-left font-medium">
                                         Type
@@ -118,6 +122,15 @@ export default function PackagesIndex({ packages }: PageProps) {
                                             )}
                                         </td>
                                         <td className="px-4 py-3">
+                                            <Badge variant="outline">
+                                                {
+                                                    ECOSYSTEM_LABELS[
+                                                        pkg.ecosystem
+                                                    ]
+                                                }
+                                            </Badge>
+                                        </td>
+                                        <td className="px-4 py-3">
                                             <TypeBadge type={pkg.type} />
                                         </td>
                                         <td className="px-4 py-3">
@@ -145,23 +158,41 @@ export default function PackagesIndex({ packages }: PageProps) {
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            disabled={pkg.is_syncing}
+                                                            disabled={
+                                                                pkg.is_syncing
+                                                            }
                                                         >
                                                             <Trash2 className="size-3" />
                                                         </Button>
                                                     </AlertDialogTrigger>
                                                     <AlertDialogContent>
                                                         <AlertDialogHeader>
-                                                            <AlertDialogTitle>Delete package</AlertDialogTitle>
+                                                            <AlertDialogTitle>
+                                                                Delete package
+                                                            </AlertDialogTitle>
                                                             <AlertDialogDescription>
-                                                                Are you sure you want to delete <strong>{pkg.name}</strong>? This action cannot be undone and will remove all associated versions and data.
+                                                                Are you sure you
+                                                                want to delete{' '}
+                                                                <strong>
+                                                                    {pkg.name}
+                                                                </strong>
+                                                                ? This action
+                                                                cannot be undone
+                                                                and will remove
+                                                                all associated
+                                                                versions and
+                                                                data.
                                                             </AlertDialogDescription>
                                                         </AlertDialogHeader>
                                                         <AlertDialogFooter>
-                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                            <AlertDialogCancel>
+                                                                Cancel
+                                                            </AlertDialogCancel>
                                                             <AlertDialogAction
                                                                 onClick={() =>
-                                                                    router.delete(`/packages/${pkg.id}`)
+                                                                    router.delete(
+                                                                        `/packages/${pkg.id}`,
+                                                                    )
                                                                 }
                                                             >
                                                                 Delete
@@ -184,6 +215,7 @@ export default function PackagesIndex({ packages }: PageProps) {
 
 function TypeBadge({ type }: { type: Package['type'] }) {
     const labels = { github: 'GitHub', gitlab: 'GitLab', git: 'Git' };
+
     return <Badge variant="secondary">{labels[type]}</Badge>;
 }
 
@@ -196,6 +228,7 @@ function SyncStatus({ pkg }: { pkg: Package }) {
             </Badge>
         );
     }
+
     if (pkg.sync_error) {
         return (
             <Badge variant="destructive" title={pkg.sync_error}>
@@ -203,6 +236,7 @@ function SyncStatus({ pkg }: { pkg: Package }) {
             </Badge>
         );
     }
+
     if (pkg.last_synced_at) {
         return (
             <span className="text-xs text-muted-foreground">
@@ -210,9 +244,8 @@ function SyncStatus({ pkg }: { pkg: Package }) {
             </span>
         );
     }
-    return (
-        <Badge variant="outline">Pending</Badge>
-    );
+
+    return <Badge variant="outline">Pending</Badge>;
 }
 
 PackagesIndex.layout = {

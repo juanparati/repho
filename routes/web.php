@@ -6,13 +6,50 @@ use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GitHubOAuthController;
 use App\Http\Controllers\InstructionsController;
+use App\Http\Controllers\NpmProxyController;
+use App\Http\Controllers\NpmRegistryController;
 use App\Http\Controllers\PackageController;
 use App\Http\Controllers\ProxySettingController;
 use App\Http\Controllers\ProxyUpstreamController;
 use App\Http\Controllers\RepositoryController;
+use App\Models\Package;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard')->name('home');
+
+// npm Registry API (per-repository, with optional auth). Scoped names arrive
+// as "@scope/name" or "@scope%2Fname"; the router decodes both.
+Route::prefix('npm/{repository:slug}')
+    ->middleware(['repo.auth', 'throttle:600,1'])
+    ->group(function () {
+        Route::get('-/ping', [NpmRegistryController::class, 'ping'])
+            ->name('npm.ping');
+        Route::get('-/package/{name}/dist-tags', [NpmRegistryController::class, 'distTags'])
+            ->name('npm.dist-tags')
+            ->where('name', Package::NPM_NAME_PATTERN);
+        Route::get('{name}/-/{file}.tgz', [NpmRegistryController::class, 'tarball'])
+            ->name('npm.tarball')
+            ->where('name', Package::NPM_NAME_PATTERN)
+            ->where('file', '[a-z0-9][a-z0-9._-]*');
+        Route::get('{name}', [NpmRegistryController::class, 'packument'])
+            ->name('npm.packument')
+            ->where('name', Package::NPM_NAME_PATTERN);
+    });
+
+// npm Proxy API (with optional auth)
+Route::prefix('proxy/npm')
+    ->middleware(['proxy.auth:npm', 'throttle:600,1'])
+    ->group(function () {
+        Route::get('-/ping', [NpmProxyController::class, 'ping'])
+            ->name('proxy.npm.ping');
+        Route::get('-/tarball/{encodedUrl}/{signature}', [NpmProxyController::class, 'tarball'])
+            ->name('proxy.npm.tarball')
+            ->where('encodedUrl', '[A-Za-z0-9_\-]+')
+            ->where('signature', '[a-f0-9]{64}');
+        Route::get('{name}', [NpmProxyController::class, 'packument'])
+            ->name('proxy.npm.packument')
+            ->where('name', Package::NPM_NAME_PATTERN);
+    });
 
 // Composer V2 Repository API (per-repository, with optional auth)
 Route::prefix('repo/{repository:slug}')
@@ -30,7 +67,7 @@ Route::prefix('repo/{repository:slug}')
 
 // Composer Proxy API (with optional auth)
 Route::prefix('proxy')
-    ->middleware(['proxy.auth', 'throttle:120,1'])
+    ->middleware(['proxy.auth:composer', 'throttle:120,1'])
     ->group(function () {
         Route::get('packages.json', [ComposerProxyController::class, 'packagesJson'])
             ->name('proxy.packages');

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\Ecosystem;
 use App\Enums\PackageType;
 use App\Models\Package;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -21,6 +22,7 @@ class PackageFactory extends Factory
 
         return [
             'name' => $vendor.'/'.$name,
+            'ecosystem' => Ecosystem::Composer,
             'repository_url' => 'https://github.com/'.$vendor.'/'.$name,
             'type' => PackageType::GitHub,
             'credential_id' => null,
@@ -34,7 +36,7 @@ class PackageFactory extends Factory
     public function github(): static
     {
         return $this->state(function (array $attributes) {
-            $name = $attributes['name'];
+            $name = ltrim($attributes['name'], '@');
 
             return [
                 'type' => PackageType::GitHub,
@@ -46,7 +48,7 @@ class PackageFactory extends Factory
     public function gitlab(): static
     {
         return $this->state(function (array $attributes) {
-            $name = $attributes['name'];
+            $name = ltrim($attributes['name'], '@');
 
             return [
                 'type' => PackageType::GitLab,
@@ -62,6 +64,14 @@ class PackageFactory extends Factory
                 'type' => PackageType::Git,
             ];
         });
+    }
+
+    public function npm(?string $name = null): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'ecosystem' => Ecosystem::Npm,
+            'name' => $name ?? '@'.$attributes['name'],
+        ]);
     }
 
     public function synced(): static

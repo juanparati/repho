@@ -7,14 +7,16 @@ use App\Models\Package;
 interface PackageFetcher
 {
     /**
-     * Fetch all versions (tags + dev branches) from the remote repository.
+     * Fetch all versions from the remote repository: tags, plus the default
+     * branch as a dev version for Composer packages. The manifest is the
+     * decoded composer.json or package.json of that revision.
      *
-     * @return array<int, array{version: string, version_normalized: string, reference: string, composer_json: array<string, mixed>, released_at: string|null}>
+     * @return array<int, array{version: string, version_normalized: string, reference: string, manifest: array<string, mixed>, released_at: string|null}>
      */
     public function fetchVersions(Package $package): array;
 
     /**
-     * Get the raw dist archive content for a specific version.
+     * Get the raw Git archive (zip) for a specific version.
      *
      * @return resource|string|null
      */

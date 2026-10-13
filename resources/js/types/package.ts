@@ -1,6 +1,14 @@
+export type Ecosystem = 'composer' | 'npm';
+
+export const ECOSYSTEM_LABELS: Record<Ecosystem, string> = {
+    composer: 'Composer',
+    npm: 'npm',
+};
+
 export type Package = {
     id: number;
     name: string;
+    ecosystem: Ecosystem;
     repository_url: string;
     type: 'github' | 'gitlab' | 'git';
     download_dists: boolean;
@@ -18,6 +26,7 @@ export type Version = {
     version: string;
     version_normalized: string;
     reference: string;
+    integrity?: string | null;
     released_at: string | null;
     created_at: string;
     dist_url: string | null;
@@ -34,7 +43,8 @@ export type Repository = {
 };
 
 export type ProxySetting = {
-    enabled: boolean;
+    composer_enabled: boolean;
+    npm_enabled: boolean;
     auth_type: 'none' | 'basic' | 'token';
     auth_username?: string | null;
     metadata_cache_ttl: number;
@@ -43,6 +53,7 @@ export type ProxySetting = {
 export type ProxyUpstream = {
     id: number;
     enabled: boolean;
+    ecosystem: Ecosystem;
     name: string;
     upstream_url: string;
     auth_type: 'none' | 'basic' | 'token';

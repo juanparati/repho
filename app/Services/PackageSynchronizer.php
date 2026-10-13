@@ -2,33 +2,30 @@
 
 namespace App\Services;
 
-use App\Enums\PackageType;
 use App\Models\Package;
 use App\Models\SecurityAdvisory;
 use App\Models\Version;
-use Illuminate\Support\Facades\File;
 
 class PackageSynchronizer
 {
     public function __construct(
-        private GitHubPackageFetcher $gitHub,
-        private GitLabPackageFetcher $gitLab,
-        private GitPackageFetcher $git,
+        private PackageFetcherResolver $fetchers,
+        private DistStorage $dists,
         private SecurityAdvisoryChecker $advisoryChecker,
     ) {}
 
     public function sync(Package $package): void
     {
-        $fetcher = match ($package->type) {
-            PackageType::GitHub => $this->gitHub,
-            PackageType::GitLab => $this->gitLab,
-            PackageType::Git => $this->git,
-        };
+        $fetcher = $this->fetchers->for($package);
 
         try {
             $package->update(['sync_progress' => 10]);
 
             $versions = $fetcher->fetchVersions($package);
+
+            if ($package->isNpm()) {
+                $this->assertManifestNamesMatch($package, $versions);
+            }
 
             $previousReferences = $package->versions()->pluck('reference', 'id')->all();
 
@@ -38,7 +35,7 @@ class PackageSynchronizer
 
             $package->update(['sync_progress' => 35]);
 
-            if ($package->download_dists) {
+            if ($package->storesDistsOnSync()) {
                 $this->downloadDists($package, $previousReferences, $fetcher);
             }
 
@@ -60,7 +57,29 @@ class PackageSynchronizer
     }
 
     /**
-     * @param  array<int, array{version: string, version_normalized: string, reference: string, composer_json: array<string, mixed>, released_at: string|null}>  $versions
+     * The npm client requests metadata by the exact name in package.json, so
+     * a package whose manifest carries a different name would never resolve.
+     *
+     * @param  array<int, array{version: string, version_normalized: string, reference: string, manifest: array<string, mixed>, released_at: string|null}>  $versions
+     */
+    private function assertManifestNamesMatch(Package $package, array $versions): void
+    {
+        foreach ($versions as $version) {
+            $manifestName = $version['manifest']['name'] ?? null;
+
+            if ($manifestName !== $package->name) {
+                throw new \RuntimeException(sprintf(
+                    'package.json at tag %s declares the name "%s", but this package is registered as "%s".',
+                    $version['version'],
+                    is_string($manifestName) ? $manifestName : '(missing)',
+                    $package->name,
+                ));
+            }
+        }
+    }
+
+    /**
+     * @param  array<int, array{version: string, version_normalized: string, reference: string, manifest: array<string, mixed>, released_at: string|null}>  $versions
      */
     private function storeVersions(Package $package, array $versions): void
     {
@@ -73,14 +92,14 @@ class PackageSynchronizer
             'version' => $v['version'],
             'version_normalized' => $v['version_normalized'],
             'reference' => $v['reference'],
-            'composer_json' => json_encode($v['composer_json']),
+            'manifest' => json_encode($v['manifest']),
             'released_at' => $v['released_at'],
         ], $versions);
 
         Version::upsert(
             $rows,
             ['package_id', 'version_normalized'],
-            ['version', 'reference', 'composer_json', 'released_at'],
+            ['version', 'reference', 'manifest', 'released_at'],
         );
 
         $normalizedVersions = array_column($versions, 'version_normalized');
@@ -97,14 +116,19 @@ class PackageSynchronizer
         $currentVersions = $package->versions()->get();
         $previousReferenceValues = array_values($previousReferences);
 
+        // npm tarballs are mandatory, so a version whose build failed earlier
+        // is retried on the next sync instead of being left without a dist.
         $newVersions = $currentVersions->filter(
-            fn (Version $version) => ! in_array($version->reference, $previousReferenceValues),
+            fn (Version $version) => ! in_array($version->reference, $previousReferenceValues)
+                || ($package->isNpm() && ! $this->dists->exists($package, $version->reference)),
         );
 
         $currentReferences = $currentVersions->pluck('reference')->all();
         $removedReferences = array_diff($previousReferenceValues, $currentReferences);
 
-        $this->cleanUpRemovedDists($package, $removedReferences);
+        foreach ($removedReferences as $reference) {
+            $this->dists->delete($package, $reference);
+        }
 
         if ($newVersions->isEmpty()) {
             return;
@@ -114,55 +138,21 @@ class PackageSynchronizer
         $total = $newVersions->count();
 
         foreach ($newVersions as $version) {
-            $this->downloadVersionDist($package, $version, $fetcher);
+            $this->dists->store($package, $version, $fetcher);
             $completed++;
             $progress = 35 + (int) round(($completed / $total) * 60);
             $package->update(['sync_progress' => $progress]);
         }
     }
 
-    private function downloadVersionDist(Package $package, Version $version, PackageFetcher $fetcher): void
-    {
-        $cachePath = config('repho.dist_cache_path')."/{$package->vendor()}/{$package->shortName()}/{$version->reference}.zip";
-
-        if (file_exists($cachePath)) {
-            return;
-        }
-
-        $archive = $fetcher->getDistArchive($package, $version->reference);
-
-        if ($archive === null) {
-            return;
-        }
-
-        $cacheDir = dirname($cachePath);
-        if (! is_dir($cacheDir)) {
-            mkdir($cacheDir, 0755, true);
-        }
-
-        file_put_contents($cachePath, $archive);
-    }
-
-    /**
-     * @param  array<int, string>  $removedReferences
-     */
-    private function cleanUpRemovedDists(Package $package, array $removedReferences): void
-    {
-        $basePath = config('repho.dist_cache_path')."/{$package->vendor()}/{$package->shortName()}";
-
-        foreach ($removedReferences as $ref) {
-            $path = "{$basePath}/{$ref}.zip";
-
-            if (file_exists($path)) {
-                File::delete($path);
-            }
-        }
-    }
-
     private function syncAdvisories(Package $package): void
     {
         try {
-            $advisories = $this->advisoryChecker->check($package->name);
+            $advisories = $this->advisoryChecker->check(
+                $package->name,
+                $package->ecosystem,
+                $package->versions()->pluck('version')->all(),
+            );
         } catch (\Throwable) {
             return;
         }
@@ -193,13 +183,13 @@ class PackageSynchronizer
     }
 
     /**
-     * @param  array<int, array{version: string, version_normalized: string, reference: string, composer_json: array<string, mixed>, released_at: string|null}>  $versions
+     * @param  array<int, array{version: string, version_normalized: string, reference: string, manifest: array<string, mixed>, released_at: string|null}>  $versions
      */
     private function extractDescription(array $versions): ?string
     {
         foreach ($versions as $version) {
-            if (isset($version['composer_json']['description'])) {
-                return $version['composer_json']['description'];
+            if (isset($version['manifest']['description'])) {
+                return $version['manifest']['description'];
             }
         }
 

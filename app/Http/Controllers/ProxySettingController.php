@@ -17,7 +17,8 @@ class ProxySettingController extends Controller
 
         return Inertia::render('proxy/edit', [
             'settings' => [
-                'enabled' => $settings->enabled,
+                'composer_enabled' => $settings->composer_enabled,
+                'npm_enabled' => $settings->npm_enabled,
                 'auth_type' => $settings->auth_type->value,
                 'auth_username' => $settings->auth_username,
                 'metadata_cache_ttl' => $settings->metadata_cache_ttl,
@@ -28,6 +29,7 @@ class ProxySettingController extends Controller
                 ->map(fn (ProxyUpstream $upstream) => [
                     'id' => $upstream->id,
                     'enabled' => $upstream->enabled,
+                    'ecosystem' => $upstream->ecosystem->value,
                     'name' => $upstream->name,
                     'upstream_url' => $upstream->upstream_url,
                     'auth_type' => $upstream->auth_type->value,

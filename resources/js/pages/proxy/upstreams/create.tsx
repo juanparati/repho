@@ -25,7 +25,7 @@ export default function UpstreamsCreate() {
             <div className="mx-auto max-w-2xl space-y-6 p-4">
                 <Heading
                     title="Add Upstream"
-                    description="Add a new upstream Composer repository to proxy."
+                    description="Add an upstream Composer repository or npm registry to proxy."
                 />
 
                 <Form
@@ -53,6 +53,25 @@ export default function UpstreamsCreate() {
                             </label>
 
                             <div className="grid gap-2">
+                                <Label htmlFor="ecosystem">Ecosystem</Label>
+                                <Select
+                                    name="ecosystem"
+                                    defaultValue="composer"
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="composer">
+                                            Composer
+                                        </SelectItem>
+                                        <SelectItem value="npm">npm</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <InputError message={errors.ecosystem} />
+                            </div>
+
+                            <div className="grid gap-2">
                                 <Label htmlFor="name">Name</Label>
                                 <Input
                                     id="name"
@@ -71,7 +90,7 @@ export default function UpstreamsCreate() {
                                     id="upstream_url"
                                     name="upstream_url"
                                     type="url"
-                                    placeholder="https://repo.packagist.org"
+                                    placeholder="https://repo.packagist.org or https://registry.npmjs.org"
                                     required
                                 />
                                 <InputError message={errors.upstream_url} />
@@ -92,7 +111,9 @@ export default function UpstreamsCreate() {
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="auth_type">Authentication</Label>
+                                <Label htmlFor="auth_type">
+                                    Authentication
+                                </Label>
                                 <Select
                                     name="auth_type"
                                     defaultValue="none"
@@ -162,9 +183,7 @@ export default function UpstreamsCreate() {
                             )}
 
                             <Button type="submit" disabled={processing}>
-                                {processing
-                                    ? 'Adding...'
-                                    : 'Add Upstream'}
+                                {processing ? 'Adding...' : 'Add Upstream'}
                             </Button>
                         </>
                     )}

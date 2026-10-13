@@ -2,54 +2,51 @@
 
 namespace App\Services;
 
+use App\Concerns\NormalizesTagVersions;
 use App\Models\Package;
-use Composer\Semver\VersionParser;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 
 class GitLabPackageFetcher implements PackageFetcher
 {
-    private VersionParser $versionParser;
-
-    public function __construct()
-    {
-        $this->versionParser = new VersionParser;
-    }
+    use NormalizesTagVersions;
 
     public function fetchVersions(Package $package): array
     {
         $projectPath = $this->parseProjectPath($package->repository_url);
         $client = $this->buildClient($package);
+        $manifestFile = $package->ecosystem->manifestFile();
         $versions = [];
 
         $tags = $this->fetchAllTags($client, $projectPath);
 
         foreach ($tags as $tag) {
             $tagName = $tag['name'];
-            $composerJson = $this->fetchComposerJson($client, $projectPath, $tagName);
+            $resolved = $this->resolveTagVersion($package, $tagName);
 
-            if ($composerJson === null) {
+            if ($resolved === null) {
                 continue;
             }
 
-            try {
-                $normalized = $this->versionParser->normalize($tagName);
-            } catch (\UnexpectedValueException) {
+            $manifest = $this->fetchManifest($client, $projectPath, $tagName, $manifestFile);
+
+            if ($manifest === null) {
                 continue;
             }
 
             $versions[] = [
-                'version' => $tagName,
-                'version_normalized' => $normalized,
+                ...$resolved,
                 'reference' => $tag['commit']['id'],
-                'composer_json' => $composerJson,
+                'manifest' => $manifest,
                 'released_at' => $tag['commit']['committed_date'] ?? null,
             ];
         }
 
-        $devVersion = $this->fetchDevVersion($client, $projectPath);
-        if ($devVersion !== null) {
-            $versions[] = $devVersion;
+        if ($package->isComposer()) {
+            $devVersion = $this->fetchDevVersion($client, $projectPath, $manifestFile);
+            if ($devVersion !== null) {
+                $versions[] = $devVersion;
+            }
         }
 
         return $versions;
@@ -142,11 +139,11 @@ class GitLabPackageFetcher implements PackageFetcher
     /**
      * @return array<string, mixed>|null
      */
-    private function fetchComposerJson(PendingRequest $client, string $projectPath, string $ref): ?array
+    private function fetchManifest(PendingRequest $client, string $projectPath, string $ref, string $file): ?array
     {
         $encodedPath = urlencode($projectPath);
 
-        $response = $client->get("/api/v4/projects/{$encodedPath}/repository/files/composer.json/raw", [
+        $response = $client->get("/api/v4/projects/{$encodedPath}/repository/files/{$file}/raw", [
             'ref' => $ref,
         ]);
 
@@ -160,9 +157,9 @@ class GitLabPackageFetcher implements PackageFetcher
     }
 
     /**
-     * @return array{version: string, version_normalized: string, reference: string, composer_json: array<string, mixed>, released_at: string|null}|null
+     * @return array{version: string, version_normalized: string, reference: string, manifest: array<string, mixed>, released_at: string|null}|null
      */
-    private function fetchDevVersion(PendingRequest $client, string $projectPath): ?array
+    private function fetchDevVersion(PendingRequest $client, string $projectPath, string $manifestFile): ?array
     {
         $encodedPath = urlencode($projectPath);
 
@@ -181,9 +178,9 @@ class GitLabPackageFetcher implements PackageFetcher
         }
 
         $sha = $branchResponse->json('commit.id');
-        $composerJson = $this->fetchComposerJson($client, $projectPath, $defaultBranch);
+        $manifest = $this->fetchManifest($client, $projectPath, $defaultBranch, $manifestFile);
 
-        if ($composerJson === null) {
+        if ($manifest === null) {
             return null;
         }
 
@@ -191,7 +188,7 @@ class GitLabPackageFetcher implements PackageFetcher
             'version' => "dev-{$defaultBranch}",
             'version_normalized' => "dev-{$defaultBranch}",
             'reference' => $sha,
-            'composer_json' => $composerJson,
+            'manifest' => $manifest,
             'released_at' => null,
         ];
     }

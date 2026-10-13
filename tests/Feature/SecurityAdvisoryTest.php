@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Ecosystem;
 use App\Models\Repository;
 use App\Models\User;
 use App\Services\SecurityAdvisoryChecker;
@@ -27,7 +28,7 @@ class SecurityAdvisoryTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/vulnerable-package')
+                ->with('vendor/vulnerable-package', Ecosystem::Composer)
                 ->once()
                 ->andReturn([
                     [
@@ -107,7 +108,7 @@ class SecurityAdvisoryTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/safe-package')
+                ->with('vendor/safe-package', Ecosystem::Composer)
                 ->once()
                 ->andReturn([]);
         });

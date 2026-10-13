@@ -25,11 +25,11 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import {
-    type ChartConfig,
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent,
 } from '@/components/ui/chart';
+import type { ChartConfig } from '@/components/ui/chart';
 import {
     Select,
     SelectContent,
@@ -37,6 +37,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { ECOSYSTEM_LABELS } from '@/types/package';
 import type { Package, Repository, Version } from '@/types/package';
 
 const chartConfig = {
@@ -86,7 +87,11 @@ export default function PackagesShow({
                         description={pkg.description ?? undefined}
                     />
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" asChild disabled={pkg.is_syncing}>
+                        <Button
+                            variant="outline"
+                            asChild
+                            disabled={pkg.is_syncing}
+                        >
                             <Link href={`/packages/${pkg.id}/edit`}>
                                 <Pencil className="mr-2 size-4" />
                                 Edit
@@ -114,13 +119,20 @@ export default function PackagesShow({
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                                 <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete package</AlertDialogTitle>
+                                    <AlertDialogTitle>
+                                        Delete package
+                                    </AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        Are you sure you want to delete <strong>{pkg.name}</strong>? This action cannot be undone and will remove all associated versions and data.
+                                        Are you sure you want to delete{' '}
+                                        <strong>{pkg.name}</strong>? This action
+                                        cannot be undone and will remove all
+                                        associated versions and data.
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogCancel>
+                                        Cancel
+                                    </AlertDialogCancel>
                                     <AlertDialogAction
                                         onClick={() =>
                                             router.delete(`/packages/${pkg.id}`)
@@ -135,6 +147,11 @@ export default function PackagesShow({
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-3">
+                    <InfoCard label="Ecosystem">
+                        <Badge variant="outline">
+                            {ECOSYSTEM_LABELS[pkg.ecosystem]}
+                        </Badge>
+                    </InfoCard>
                     <InfoCard label="Type">
                         <Badge variant="secondary">
                             {
@@ -162,8 +179,18 @@ export default function PackagesShow({
                         </span>
                     </InfoCard>
                     <InfoCard label="Download Dists">
-                        <Badge variant={pkg.download_dists ? 'default' : 'secondary'}>
-                            {pkg.download_dists ? 'Enabled' : 'Disabled'}
+                        <Badge
+                            variant={
+                                pkg.download_dists || pkg.ecosystem === 'npm'
+                                    ? 'default'
+                                    : 'secondary'
+                            }
+                        >
+                            {pkg.ecosystem === 'npm'
+                                ? 'Always (tarballs built on sync)'
+                                : pkg.download_dists
+                                  ? 'Enabled'
+                                  : 'Disabled'}
                         </Badge>
                     </InfoCard>
                 </div>
@@ -175,7 +202,9 @@ export default function PackagesShow({
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setShowAddRepository(!showAddRepository)}
+                                onClick={() =>
+                                    setShowAddRepository(!showAddRepository)
+                                }
                             >
                                 <Plus className="size-4" />
                             </Button>
@@ -336,7 +365,10 @@ export default function PackagesShow({
                                             <td className="px-4 py-3 font-mono">
                                                 {v.version}
                                             </td>
-                                            <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                                            <td
+                                                className="px-4 py-3 font-mono text-xs text-muted-foreground"
+                                                title={v.integrity ?? undefined}
+                                            >
                                                 {v.reference.substring(0, 12)}
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground">
@@ -347,8 +379,14 @@ export default function PackagesShow({
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 {v.dist_url && (
-                                                    <a href={v.dist_url} download>
-                                                        <Button variant="ghost" size="sm">
+                                                    <a
+                                                        href={v.dist_url}
+                                                        download
+                                                    >
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                        >
                                                             <Download className="size-4" />
                                                         </Button>
                                                     </a>
@@ -387,6 +425,7 @@ export default function PackagesShow({
                                         const date = new Date(
                                             value + 'T00:00:00',
                                         );
+
                                         return date.toLocaleDateString(
                                             'en-US',
                                             {
@@ -409,6 +448,7 @@ export default function PackagesShow({
                                                 const date = new Date(
                                                     value + 'T00:00:00',
                                                 );
+
                                                 return date.toLocaleDateString(
                                                     'en-US',
                                                     {

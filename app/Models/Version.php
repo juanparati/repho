@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['package_id', 'version', 'version_normalized', 'reference', 'composer_json', 'released_at'])]
+#[Fillable(['package_id', 'version', 'version_normalized', 'reference', 'shasum', 'integrity', 'manifest', 'released_at'])]
 class Version extends Model
 {
     /** @use HasFactory<VersionFactory> */
@@ -21,7 +21,7 @@ class Version extends Model
     protected function casts(): array
     {
         return [
-            'composer_json' => 'array',
+            'manifest' => 'array',
             'released_at' => 'datetime',
         ];
     }

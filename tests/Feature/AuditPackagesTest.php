@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Ecosystem;
 use App\Models\Package;
 use App\Notifications\VulnerabilitiesFound;
 use App\Services\SecurityAdvisoryChecker;
@@ -37,7 +38,7 @@ class AuditPackagesTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/safe-pkg')
+                ->with('vendor/safe-pkg', Ecosystem::Composer, [])
                 ->once()
                 ->andReturn([]);
         });
@@ -53,7 +54,7 @@ class AuditPackagesTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/vuln-pkg')
+                ->with('vendor/vuln-pkg', Ecosystem::Composer, [])
                 ->once()
                 ->andReturn([$this->sampleAdvisory]);
         });
@@ -75,7 +76,7 @@ class AuditPackagesTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/by-id')
+                ->with('vendor/by-id', Ecosystem::Composer, [])
                 ->once()
                 ->andReturn([]);
         });
@@ -105,11 +106,11 @@ class AuditPackagesTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/pkg-a')
+                ->with('vendor/pkg-a', Ecosystem::Composer, [])
                 ->once()
                 ->andReturn([$this->sampleAdvisory]);
             $mock->shouldReceive('check')
-                ->with('vendor/pkg-b')
+                ->with('vendor/pkg-b', Ecosystem::Composer, [])
                 ->once()
                 ->andReturn([]);
         });
@@ -128,11 +129,11 @@ class AuditPackagesTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/pkg-a')
+                ->with('vendor/pkg-a', Ecosystem::Composer, [])
                 ->once()
                 ->andThrow(new \RuntimeException('Connection timeout'));
             $mock->shouldReceive('check')
-                ->with('vendor/pkg-b')
+                ->with('vendor/pkg-b', Ecosystem::Composer, [])
                 ->once()
                 ->andReturn([$this->sampleAdvisory]);
         });
@@ -151,7 +152,7 @@ class AuditPackagesTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/pkg-a')
+                ->with('vendor/pkg-a', Ecosystem::Composer, [])
                 ->once()
                 ->andThrow(new \RuntimeException('API down'));
         });
@@ -167,7 +168,7 @@ class AuditPackagesTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/fail-pkg')
+                ->with('vendor/fail-pkg', Ecosystem::Composer, [])
                 ->once()
                 ->andThrow(new \RuntimeException('Connection timeout'));
         });
@@ -186,7 +187,7 @@ class AuditPackagesTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/vuln-pkg')
+                ->with('vendor/vuln-pkg', Ecosystem::Composer, [])
                 ->once()
                 ->andReturn([$this->sampleAdvisory]);
         });
@@ -209,7 +210,7 @@ class AuditPackagesTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/vuln-pkg')
+                ->with('vendor/vuln-pkg', Ecosystem::Composer, [])
                 ->once()
                 ->andReturn([$this->sampleAdvisory]);
         });
@@ -235,7 +236,7 @@ class AuditPackagesTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/vuln-pkg')
+                ->with('vendor/vuln-pkg', Ecosystem::Composer, [])
                 ->once()
                 ->andReturn([$this->sampleAdvisory]);
         });
@@ -260,7 +261,7 @@ class AuditPackagesTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/vuln-pkg')
+                ->with('vendor/vuln-pkg', Ecosystem::Composer, [])
                 ->once()
                 ->andReturn([$this->sampleAdvisory]);
         });
@@ -280,7 +281,7 @@ class AuditPackagesTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/safe-pkg')
+                ->with('vendor/safe-pkg', Ecosystem::Composer, [])
                 ->once()
                 ->andReturn([]);
         });
@@ -300,7 +301,7 @@ class AuditPackagesTest extends TestCase
 
         $this->mock(SecurityAdvisoryChecker::class, function ($mock) {
             $mock->shouldReceive('check')
-                ->with('vendor/vuln-pkg')
+                ->with('vendor/vuln-pkg', Ecosystem::Composer, [])
                 ->once()
                 ->andReturn([$this->sampleAdvisory]);
         });

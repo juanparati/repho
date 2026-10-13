@@ -1,6 +1,7 @@
 import { Form, Head } from '@inertiajs/react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -12,12 +13,18 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { ECOSYSTEM_LABELS } from '@/types/package';
 import type { Credential, Package } from '@/types/package';
 
 type PageProps = {
     package: Pick<
         Package,
-        'id' | 'name' | 'repository_url' | 'type' | 'download_dists'
+        | 'id'
+        | 'name'
+        | 'ecosystem'
+        | 'repository_url'
+        | 'type'
+        | 'download_dists'
     > & {
         credential_id: number | null;
     };
@@ -42,6 +49,15 @@ export default function PackagesEdit({ package: pkg, credentials }: PageProps) {
                 >
                     {({ errors, processing }) => (
                         <>
+                            <div className="grid gap-2">
+                                <Label>Ecosystem</Label>
+                                <div>
+                                    <Badge variant="outline">
+                                        {ECOSYSTEM_LABELS[pkg.ecosystem]}
+                                    </Badge>
+                                </div>
+                            </div>
+
                             <div className="grid gap-2">
                                 <Label htmlFor="repository_url">
                                     Repository URL
@@ -104,16 +120,18 @@ export default function PackagesEdit({ package: pkg, credentials }: PageProps) {
                                 <InputError message={errors.credential_id} />
                             </div>
 
-                            <label className="flex items-center gap-2">
-                                <Checkbox
-                                    name="download_dists"
-                                    value="1"
-                                    defaultChecked={pkg.download_dists}
-                                />
-                                <span className="text-sm">
-                                    Download dist archives on sync
-                                </span>
-                            </label>
+                            {pkg.ecosystem === 'composer' && (
+                                <label className="flex items-center gap-2">
+                                    <Checkbox
+                                        name="download_dists"
+                                        value="1"
+                                        defaultChecked={pkg.download_dists}
+                                    />
+                                    <span className="text-sm">
+                                        Download dist archives on sync
+                                    </span>
+                                </label>
+                            )}
 
                             <Button type="submit" disabled={processing}>
                                 {processing ? 'Saving...' : 'Save Changes'}

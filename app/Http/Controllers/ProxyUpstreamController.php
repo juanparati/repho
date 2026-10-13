@@ -30,6 +30,7 @@ class ProxyUpstreamController extends Controller
             'upstream' => [
                 'id' => $upstream->id,
                 'enabled' => $upstream->enabled,
+                'ecosystem' => $upstream->ecosystem->value,
                 'name' => $upstream->name,
                 'upstream_url' => $upstream->upstream_url,
                 'auth_type' => $upstream->auth_type->value,

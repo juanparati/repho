@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Ecosystem;
 use App\Http\Requests\StorePackageRequest;
 use App\Http\Requests\UpdatePackageRequest;
 use App\Jobs\SyncPackage;
@@ -10,6 +11,8 @@ use App\Models\DownloadStatistic;
 use App\Models\Package;
 use App\Models\Repository;
 use App\Models\Version;
+use App\Services\DistStorage;
+use App\Services\NpmSemver;
 use App\Services\SecurityAdvisoryChecker;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,6 +23,10 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PackageController extends Controller
 {
+    public function __construct(
+        private DistStorage $dists,
+    ) {}
+
     public function index(): Response
     {
         return Inertia::render('packages/index', [
@@ -30,6 +37,7 @@ class PackageController extends Controller
                 ->map(fn (Package $package) => [
                     'id' => $package->id,
                     'name' => $package->name,
+                    'ecosystem' => $package->ecosystem->value,
                     'repository_url' => $package->repository_url,
                     'type' => $package->type->value,
                     'description' => $package->description,
@@ -57,9 +65,12 @@ class PackageController extends Controller
         $repositoryIds = $validated['repository_ids'] ?? [];
         unset($validated['repository_ids']);
 
-        $packageName = $this->guessPackageName($validated['repository_url']);
+        $ecosystem = Ecosystem::from($validated['ecosystem']);
+        $packageName = $ecosystem === Ecosystem::Npm
+            ? $validated['name']
+            : $this->guessPackageName($validated['repository_url']);
 
-        $advisories = $advisoryChecker->check($packageName);
+        $advisories = $advisoryChecker->check($packageName, $ecosystem);
 
         if (! empty($advisories)) {
             $messages = array_map(
@@ -100,6 +111,7 @@ class PackageController extends Controller
             'package' => [
                 'id' => $package->id,
                 'name' => $package->name,
+                'ecosystem' => $package->ecosystem->value,
                 'repository_url' => $package->repository_url,
                 'type' => $package->type->value,
                 'download_dists' => $package->download_dists,
@@ -117,23 +129,22 @@ class PackageController extends Controller
             ],
             'versions' => $package->versions()
                 ->get()
-                ->sort(fn ($a, $b) => version_compare($b->version_normalized, $a->version_normalized))
+                ->sort(fn ($a, $b) => $package->isNpm()
+                    ? NpmSemver::compare($b->version_normalized, $a->version_normalized)
+                    : version_compare($b->version_normalized, $a->version_normalized))
                 ->values()
-                ->map(function ($v) use ($package) {
-                    $distPath = config('repho.dist_cache_path')."/{$package->vendor()}/{$package->shortName()}/{$v->reference}.zip";
-
-                    return [
-                        'id' => $v->id,
-                        'version' => $v->version,
-                        'version_normalized' => $v->version_normalized,
-                        'reference' => $v->reference,
-                        'released_at' => $v->released_at?->toDateTimeString(),
-                        'created_at' => $v->created_at->toDateTimeString(),
-                        'dist_url' => file_exists($distPath)
-                            ? route('packages.versions.download', [$package, $v])
-                            : null,
-                    ];
-                }),
+                ->map(fn ($v) => [
+                    'id' => $v->id,
+                    'version' => $v->version,
+                    'version_normalized' => $v->version_normalized,
+                    'reference' => $v->reference,
+                    'integrity' => $v->integrity,
+                    'released_at' => $v->released_at?->toDateTimeString(),
+                    'created_at' => $v->created_at->toDateTimeString(),
+                    'dist_url' => $this->dists->exists($package, $v->reference)
+                        ? route('packages.versions.download', [$package, $v])
+                        : null,
+                ]),
             'availableRepositories' => Repository::query()
                 ->whereNotIn('id', $package->repositories->pluck('id'))
                 ->get(['id', 'name', 'slug']),
@@ -152,6 +163,7 @@ class PackageController extends Controller
             'package' => [
                 'id' => $package->id,
                 'name' => $package->name,
+                'ecosystem' => $package->ecosystem->value,
                 'repository_url' => $package->repository_url,
                 'type' => $package->type->value,
                 'credential_id' => $package->credential_id,
@@ -218,13 +230,13 @@ class PackageController extends Controller
     {
         abort_unless($version->package_id === $package->id, 404);
 
-        $cachePath = config('repho.dist_cache_path')."/{$package->vendor()}/{$package->shortName()}/{$version->reference}.zip";
+        abort_unless($this->dists->exists($package, $version->reference), 404);
 
-        abort_unless(file_exists($cachePath), 404);
-
-        return response()->download($cachePath, "{$package->shortName()}-{$version->version}.zip", [
-            'Content-Type' => 'application/zip',
-        ]);
+        return response()->download(
+            $this->dists->path($package, $version->reference),
+            $this->dists->downloadName($package, $version->version),
+            ['Content-Type' => $this->dists->contentType($package)],
+        );
     }
 
     /**

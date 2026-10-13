@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\PackageType;
+use App\Enums\Ecosystem;
 use App\Models\DownloadStatistic;
+use App\Models\Package;
 use App\Models\Repository;
-use App\Services\GitHubPackageFetcher;
-use App\Services\GitLabPackageFetcher;
-use App\Services\GitPackageFetcher;
+use App\Services\DistStorage;
 use App\Services\MetadataBuilder;
+use App\Services\PackageFetcherResolver;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,6 +17,8 @@ class ComposerController extends Controller
 {
     public function __construct(
         private MetadataBuilder $metadataBuilder,
+        private DistStorage $dists,
+        private PackageFetcherResolver $fetchers,
     ) {}
 
     public function packagesJson(Repository $repository): JsonResponse
@@ -32,8 +34,7 @@ class ComposerController extends Controller
             $devOnly = true;
         }
 
-        $fullName = "{$vendor}/{$packageName}";
-        $package = $repository->packages()->where('name', $fullName)->first();
+        $package = $this->findPackage($repository, "{$vendor}/{$packageName}");
 
         if (! $package) {
             return response()->json(['error' => 'Package not found'], Response::HTTP_NOT_FOUND);
@@ -46,50 +47,36 @@ class ComposerController extends Controller
 
     public function dist(Repository $repository, string $vendor, string $packageName, string $version, string $ref): BinaryFileResponse|Response
     {
-        $fullName = "{$vendor}/{$packageName}";
-        $package = $repository->packages()->where('name', $fullName)->first();
+        $package = $this->findPackage($repository, "{$vendor}/{$packageName}");
 
         if (! $package) {
             abort(Response::HTTP_NOT_FOUND);
         }
 
-        $versionId = $package->versions()->where('reference', $ref)->value('id');
+        $versionModel = $package->versions()->where('reference', $ref)->first();
 
-        if ($versionId === null) {
+        if ($versionModel === null) {
             abort(Response::HTTP_NOT_FOUND);
         }
 
-        DownloadStatistic::recordDownload($package->id, $versionId);
+        DownloadStatistic::recordDownload($package->id, $versionModel->id);
 
-        $cachePath = config('repho.dist_cache_path')."/{$vendor}/{$packageName}/{$ref}.zip";
+        $path = $this->dists->store($package, $versionModel, $this->fetchers->for($package));
 
-        if (file_exists($cachePath)) {
-            return response()->download($cachePath, "{$packageName}-{$version}.zip", [
-                'Content-Type' => 'application/zip',
-            ]);
-        }
-
-        $fetcher = match ($package->type) {
-            PackageType::GitHub => app(GitHubPackageFetcher::class),
-            PackageType::GitLab => app(GitLabPackageFetcher::class),
-            PackageType::Git => app(GitPackageFetcher::class),
-        };
-
-        $archive = $fetcher->getDistArchive($package, $ref);
-
-        if ($archive === null) {
+        if ($path === null) {
             abort(Response::HTTP_NOT_FOUND);
         }
 
-        $cacheDir = dirname($cachePath);
-        if (! is_dir($cacheDir)) {
-            mkdir($cacheDir, 0755, true);
-        }
-
-        file_put_contents($cachePath, $archive);
-
-        return response()->download($cachePath, "{$packageName}-{$version}.zip", [
-            'Content-Type' => 'application/zip',
+        return response()->download($path, $this->dists->downloadName($package, $version), [
+            'Content-Type' => $this->dists->contentType($package),
         ]);
+    }
+
+    private function findPackage(Repository $repository, string $fullName): ?Package
+    {
+        return $repository->packages()
+            ->where('ecosystem', Ecosystem::Composer)
+            ->where('name', $fullName)
+            ->first();
     }
 }

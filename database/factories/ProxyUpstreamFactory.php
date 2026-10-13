@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\Ecosystem;
 use App\Enums\RepositoryAuthType;
 use App\Models\ProxyUpstream;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -18,6 +19,7 @@ class ProxyUpstreamFactory extends Factory
     {
         return [
             'enabled' => true,
+            'ecosystem' => Ecosystem::Composer,
             'name' => fake()->unique()->words(2, true),
             'upstream_url' => 'https://repo.packagist.org',
             'auth_type' => RepositoryAuthType::None,
@@ -26,6 +28,14 @@ class ProxyUpstreamFactory extends Factory
             'auth_token' => null,
             'sort_order' => 0,
         ];
+    }
+
+    public function npm(): static
+    {
+        return $this->state([
+            'ecosystem' => Ecosystem::Npm,
+            'upstream_url' => 'https://registry.npmjs.org',
+        ]);
     }
 
     public function enabled(): static

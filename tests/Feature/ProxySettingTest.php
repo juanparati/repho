@@ -38,7 +38,8 @@ class ProxySettingTest extends TestCase
         $user = User::factory()->create();
 
         $response = $this->actingAs($user)->put('/proxy', [
-            'enabled' => true,
+            'composer_enabled' => true,
+            'npm_enabled' => false,
             'auth_type' => 'none',
             'metadata_cache_ttl' => 7200,
         ]);
@@ -46,7 +47,8 @@ class ProxySettingTest extends TestCase
         $response->assertRedirect('/proxy');
 
         $settings = ProxySetting::first();
-        $this->assertTrue($settings->enabled);
+        $this->assertTrue($settings->composer_enabled);
+        $this->assertFalse($settings->npm_enabled);
         $this->assertEquals(7200, $settings->metadata_cache_ttl);
     }
 
@@ -55,7 +57,8 @@ class ProxySettingTest extends TestCase
         $user = User::factory()->create();
 
         $response = $this->actingAs($user)->put('/proxy', [
-            'enabled' => true,
+            'composer_enabled' => true,
+            'npm_enabled' => false,
             'auth_type' => 'basic',
             'auth_username' => 'composer',
             'auth_password' => 'secret123',
@@ -74,7 +77,8 @@ class ProxySettingTest extends TestCase
         $user = User::factory()->create();
 
         $response = $this->actingAs($user)->put('/proxy', [
-            'enabled' => true,
+            'composer_enabled' => true,
+            'npm_enabled' => false,
             'auth_type' => 'none',
             'metadata_cache_ttl' => 10,
         ]);
@@ -87,7 +91,8 @@ class ProxySettingTest extends TestCase
         $user = User::factory()->create();
 
         $response = $this->actingAs($user)->put('/proxy', [
-            'enabled' => true,
+            'composer_enabled' => true,
+            'npm_enabled' => false,
             'auth_type' => 'basic',
             'auth_username' => '',
             'auth_password' => '',
@@ -212,5 +217,66 @@ class ProxySettingTest extends TestCase
         ]);
 
         $response->assertRedirect('/login');
+    }
+
+    public function test_user_can_enable_npm_proxy_only(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->put('/proxy', [
+            'composer_enabled' => false,
+            'npm_enabled' => true,
+            'auth_type' => 'none',
+            'metadata_cache_ttl' => 3600,
+        ]);
+
+        $response->assertRedirect('/proxy');
+
+        $settings = ProxySetting::instance();
+        $this->assertFalse($settings->composer_enabled);
+        $this->assertTrue($settings->npm_enabled);
+    }
+
+    public function test_user_can_create_npm_upstream(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/proxy/upstreams', [
+            'ecosystem' => 'npm',
+            'name' => 'npmjs',
+            'upstream_url' => 'https://registry.npmjs.org',
+            'auth_type' => 'none',
+            'sort_order' => 0,
+        ]);
+
+        $response->assertRedirect('/proxy');
+        $this->assertDatabaseHas('proxy_upstreams', ['name' => 'npmjs', 'ecosystem' => 'npm']);
+    }
+
+    public function test_upstream_ecosystem_must_be_known(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post('/proxy/upstreams', [
+            'ecosystem' => 'cargo',
+            'name' => 'crates',
+            'upstream_url' => 'https://crates.io',
+            'auth_type' => 'none',
+        ]);
+
+        $response->assertSessionHasErrors('ecosystem');
+    }
+
+    public function test_proxy_settings_page_exposes_upstream_ecosystem(): void
+    {
+        $user = User::factory()->create();
+        ProxyUpstream::factory()->npm()->create(['name' => 'npmjs']);
+
+        $this->actingAs($user)->get('/proxy')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('proxy/edit')
+                ->where('upstreams.0.ecosystem', 'npm')
+                ->has('settings.npm_enabled'));
     }
 }

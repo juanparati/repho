@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Notification;
 #[Description('Check packages for known security vulnerabilities')]
 class AuditPackages extends Command
 {
-    /** @var array<string, array<int, array{advisoryId: string, title: string, link: string, cve: string|null, affectedVersions: string, reportedAt: string, severity: string|null}>> */
+    /** @var array<string, array<int, array{advisoryId: string, title: string, link: string, cve: string|null, affectedVersions: string, reportedAt: string|null, severity: string|null}>> */
     private array $vulnerabilities = [];
 
     public function handle(SecurityAdvisoryChecker $checker): int
@@ -84,7 +84,11 @@ class AuditPackages extends Command
     private function auditPackage(SecurityAdvisoryChecker $checker, Package $package, bool $showSuccessMessage = true): int
     {
         try {
-            $advisories = $checker->check($package->name);
+            $advisories = $checker->check(
+                $package->name,
+                $package->ecosystem,
+                $package->versions()->pluck('version')->all(),
+            );
         } catch (\Throwable $e) {
             $this->error("Failed to check {$package->name}: {$e->getMessage()}");
 

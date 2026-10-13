@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\Ecosystem;
 use App\Enums\RepositoryAuthType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -13,12 +14,20 @@ class StoreProxyUpstreamRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'ecosystem' => $this->input('ecosystem', Ecosystem::Composer->value),
+        ]);
+    }
+
     /**
      * @return array<string, mixed>
      */
     public function rules(): array
     {
         return [
+            'ecosystem' => ['required', Rule::enum(Ecosystem::class)],
             'name' => ['required', 'string', 'max:255'],
             'upstream_url' => ['required', 'url', 'max:255'],
             'auth_type' => ['required', Rule::enum(RepositoryAuthType::class)],

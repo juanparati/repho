@@ -2,54 +2,51 @@
 
 namespace App\Services;
 
+use App\Concerns\NormalizesTagVersions;
 use App\Models\Package;
-use Composer\Semver\VersionParser;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 
 class GitHubPackageFetcher implements PackageFetcher
 {
-    private VersionParser $versionParser;
-
-    public function __construct()
-    {
-        $this->versionParser = new VersionParser;
-    }
+    use NormalizesTagVersions;
 
     public function fetchVersions(Package $package): array
     {
         [$owner, $repo] = $this->parseOwnerRepo($package->repository_url);
         $client = $this->buildClient($package);
+        $manifestFile = $package->ecosystem->manifestFile();
         $versions = [];
 
         $tags = $this->fetchAllTags($client, $owner, $repo);
 
         foreach ($tags as $tag) {
             $tagName = $tag['name'];
-            $composerJson = $this->fetchComposerJson($client, $owner, $repo, $tagName);
+            $resolved = $this->resolveTagVersion($package, $tagName);
 
-            if ($composerJson === null) {
+            if ($resolved === null) {
                 continue;
             }
 
-            try {
-                $normalized = $this->versionParser->normalize($tagName);
-            } catch (\UnexpectedValueException) {
+            $manifest = $this->fetchManifest($client, $owner, $repo, $tagName, $manifestFile);
+
+            if ($manifest === null) {
                 continue;
             }
 
             $versions[] = [
-                'version' => $tagName,
-                'version_normalized' => $normalized,
+                ...$resolved,
                 'reference' => $tag['commit']['sha'],
-                'composer_json' => $composerJson,
+                'manifest' => $manifest,
                 'released_at' => null,
             ];
         }
 
-        $devVersion = $this->fetchDevVersion($client, $owner, $repo);
-        if ($devVersion !== null) {
-            $versions[] = $devVersion;
+        if ($package->isComposer()) {
+            $devVersion = $this->fetchDevVersion($client, $owner, $repo, $manifestFile);
+            if ($devVersion !== null) {
+                $versions[] = $devVersion;
+            }
         }
 
         return $versions;
@@ -165,9 +162,9 @@ class GitHubPackageFetcher implements PackageFetcher
     /**
      * @return array<string, mixed>|null
      */
-    private function fetchComposerJson(PendingRequest $client, string $owner, string $repo, string $ref): ?array
+    private function fetchManifest(PendingRequest $client, string $owner, string $repo, string $ref, string $file): ?array
     {
-        $response = $client->get("/repos/{$owner}/{$repo}/contents/composer.json", [
+        $response = $client->get("/repos/{$owner}/{$repo}/contents/{$file}", [
             'ref' => $ref,
         ]);
 
@@ -187,9 +184,9 @@ class GitHubPackageFetcher implements PackageFetcher
     }
 
     /**
-     * @return array{version: string, version_normalized: string, reference: string, composer_json: array<string, mixed>, released_at: string|null}|null
+     * @return array{version: string, version_normalized: string, reference: string, manifest: array<string, mixed>, released_at: string|null}|null
      */
-    private function fetchDevVersion(PendingRequest $client, string $owner, string $repo): ?array
+    private function fetchDevVersion(PendingRequest $client, string $owner, string $repo, string $manifestFile): ?array
     {
         $response = $client->get("/repos/{$owner}/{$repo}");
 
@@ -206,9 +203,9 @@ class GitHubPackageFetcher implements PackageFetcher
         }
 
         $sha = $branchResponse->json('commit.sha');
-        $composerJson = $this->fetchComposerJson($client, $owner, $repo, $defaultBranch);
+        $manifest = $this->fetchManifest($client, $owner, $repo, $defaultBranch, $manifestFile);
 
-        if ($composerJson === null) {
+        if ($manifest === null) {
             return null;
         }
 
@@ -216,7 +213,7 @@ class GitHubPackageFetcher implements PackageFetcher
             'version' => "dev-{$defaultBranch}",
             'version_normalized' => "dev-{$defaultBranch}",
             'reference' => $sha,
-            'composer_json' => $composerJson,
+            'manifest' => $manifest,
             'released_at' => null,
         ];
     }

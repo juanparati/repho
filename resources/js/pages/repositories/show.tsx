@@ -19,6 +19,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { ECOSYSTEM_LABELS } from '@/types/package';
 import type { Package, Repository } from '@/types/package';
 
 function CopyButton({ text }: { text: string }) {
@@ -71,7 +72,7 @@ function buildComposerConfig(
         };
     } else if (authType === 'token') {
         config['config'] = {
-            'bearer': {
+            bearer: {
                 [new URL(repoUrl).host]: '<token>',
             },
         };
@@ -80,10 +81,33 @@ function buildComposerConfig(
     return JSON.stringify(config, null, 4);
 }
 
+function buildNpmrc(
+    npmUrl: string,
+    authType: Repository['auth_type'],
+    authUsername?: string | null,
+): string {
+    const url = new URL(npmUrl);
+    const authKey = `//${url.host}${url.pathname}`;
+    const lines = [`@your-scope:registry=${npmUrl}`];
+
+    if (authType === 'basic') {
+        lines.push(
+            `${authKey}:username=${authUsername ?? '<username>'}`,
+            `${authKey}:_password=<base64-of-password>`,
+        );
+    } else if (authType === 'token') {
+        lines.push(`${authKey}:_authToken=<token>`);
+    }
+
+    return lines.join('\n');
+}
+
 type PageProps = {
     repository: Repository;
-    packages: (Pick<Package, 'id' | 'name'> & { versions_count: number })[];
-    availablePackages: Pick<Package, 'id' | 'name'>[];
+    packages: (Pick<Package, 'id' | 'name' | 'ecosystem'> & {
+        versions_count: number;
+    })[];
+    availablePackages: Pick<Package, 'id' | 'name' | 'ecosystem'>[];
 };
 
 export default function RepositoriesShow({
@@ -93,6 +117,7 @@ export default function RepositoriesShow({
 }: PageProps) {
     const { appUrl } = usePage<{ appUrl: string }>().props;
     const repoUrl = `${appUrl.replace(/\/+$/, '')}/repo/${repository.slug}`;
+    const npmUrl = `${appUrl.replace(/\/+$/, '')}/npm/${repository.slug}/`;
 
     return (
         <>
@@ -115,16 +140,17 @@ export default function RepositoriesShow({
                             <DialogContent className="sm:max-w-2xl">
                                 <DialogHeader>
                                     <DialogTitle>
-                                        Composer Setup Instructions
+                                        Setup Instructions
                                     </DialogTitle>
                                     <DialogDescription>
-                                        Add the following to your project's{' '}
-                                        <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                                            composer.json
-                                        </code>{' '}
-                                        to use this repository.
+                                        This repository serves Composer packages
+                                        at <code>/repo</code> and npm packages
+                                        at <code>/npm</code>.
                                     </DialogDescription>
                                 </DialogHeader>
+                                <h4 className="text-sm font-medium">
+                                    Composer: add to composer.json
+                                </h4>
                                 <div className="relative">
                                     <CopyButton
                                         text={buildComposerConfig(
@@ -170,12 +196,43 @@ export default function RepositoriesShow({
                                         with your actual token. You can also use{' '}
                                         <code className="rounded bg-muted px-1 py-0.5">
                                             composer config bearer.
-                                            {new URL(repoUrl).host}{' '}
-                                            {'<token>'}
+                                            {new URL(repoUrl).host} {'<token>'}
                                         </code>{' '}
                                         to store the token globally.
                                     </p>
                                 )}
+                                <h4 className="text-sm font-medium">
+                                    npm: add to .npmrc
+                                </h4>
+                                <div className="relative">
+                                    <CopyButton
+                                        text={buildNpmrc(
+                                            npmUrl,
+                                            repository.auth_type,
+                                            repository.auth_username,
+                                        )}
+                                    />
+                                    <pre className="overflow-auto rounded-lg bg-muted p-4 text-sm">
+                                        <code>
+                                            {buildNpmrc(
+                                                npmUrl,
+                                                repository.auth_type,
+                                                repository.auth_username,
+                                            )}
+                                        </code>
+                                    </pre>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Replace{' '}
+                                    <code className="rounded bg-muted px-1 py-0.5">
+                                        @your-scope
+                                    </code>{' '}
+                                    with the scope of your packages, or use{' '}
+                                    <code className="rounded bg-muted px-1 py-0.5">
+                                        registry=
+                                    </code>{' '}
+                                    to route every package here.
+                                </p>
                             </DialogContent>
                         </Dialog>
                         <Button variant="outline" asChild>
@@ -200,7 +257,7 @@ export default function RepositoriesShow({
                     </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-lg border p-4">
                         <p className="mb-1 text-xs font-medium text-muted-foreground">
                             Authentication
@@ -224,6 +281,12 @@ export default function RepositoriesShow({
                             Composer URL
                         </p>
                         <code className="text-xs">{repoUrl}</code>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">
+                            npm registry URL
+                        </p>
+                        <code className="text-xs">{npmUrl}</code>
                     </div>
                     <div className="rounded-lg border p-4">
                         <p className="mb-1 text-xs font-medium text-muted-foreground">
@@ -260,7 +323,17 @@ export default function RepositoriesShow({
                                                                 pkg.id,
                                                             )}
                                                         >
-                                                            {pkg.name}
+                                                            {pkg.name}{' '}
+                                                            <span className="text-muted-foreground">
+                                                                (
+                                                                {
+                                                                    ECOSYSTEM_LABELS[
+                                                                        pkg
+                                                                            .ecosystem
+                                                                    ]
+                                                                }
+                                                                )
+                                                            </span>
                                                         </SelectItem>
                                                     ),
                                                 )}
@@ -293,6 +366,9 @@ export default function RepositoriesShow({
                                             Package
                                         </th>
                                         <th className="px-4 py-3 text-left font-medium">
+                                            Ecosystem
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
                                             Versions
                                         </th>
                                         <th className="px-4 py-3 text-right font-medium">
@@ -313,6 +389,15 @@ export default function RepositoriesShow({
                                                 >
                                                     {pkg.name}
                                                 </Link>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <Badge variant="outline">
+                                                    {
+                                                        ECOSYSTEM_LABELS[
+                                                            pkg.ecosystem
+                                                        ]
+                                                    }
+                                                </Badge>
                                             </td>
                                             <td className="px-4 py-3">
                                                 {pkg.versions_count}

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\Ecosystem;
 use App\Models\Package;
 use App\Models\Repository;
 use App\Models\Version;
@@ -17,6 +18,7 @@ class MetadataBuilder
         return [
             'metadata-url' => url("/repo/{$repository->slug}/p2/%package%.json"),
             'available-packages' => $repository->packages()
+                ->where('ecosystem', Ecosystem::Composer)
                 ->whereNotNull('last_synced_at')
                 ->pluck('name')
                 ->all(),
@@ -55,7 +57,7 @@ class MetadataBuilder
      */
     private function buildVersionEntry(Repository $repository, Package $package, Version $version): array
     {
-        $composerJson = $version->composer_json;
+        $composerJson = $version->manifest;
 
         $entry = array_merge($composerJson, [
             'name' => $package->name,
