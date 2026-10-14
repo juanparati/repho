@@ -15,7 +15,7 @@ class GitHubPackageFetcher implements PackageFetcher
     {
         [$owner, $repo] = $this->parseOwnerRepo($package->repository_url);
         $client = $this->buildClient($package);
-        $manifestFile = $package->ecosystem->manifestFile();
+        $manifestFile = $package->manifestPath();
         $versions = [];
 
         $tags = $this->fetchAllTags($client, $owner, $repo);
@@ -50,6 +50,20 @@ class GitHubPackageFetcher implements PackageFetcher
         }
 
         return $versions;
+    }
+
+    public function fetchDefaultBranchManifest(Package $package): ?array
+    {
+        [$owner, $repo] = $this->parseOwnerRepo($package->repository_url);
+        $client = $this->buildClient($package);
+
+        $defaultBranch = $this->fetchDefaultBranch($client, $owner, $repo);
+
+        if ($defaultBranch === null) {
+            return null;
+        }
+
+        return $this->fetchManifest($client, $owner, $repo, $defaultBranch, $package->manifestPath());
     }
 
     public function getDistArchive(Package $package, string $reference): mixed
@@ -159,6 +173,17 @@ class GitHubPackageFetcher implements PackageFetcher
         return $tags;
     }
 
+    private function fetchDefaultBranch(PendingRequest $client, string $owner, string $repo): ?string
+    {
+        $response = $client->get("/repos/{$owner}/{$repo}");
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        return $response->json('default_branch', 'main');
+    }
+
     /**
      * @return array<string, mixed>|null
      */
@@ -188,13 +213,11 @@ class GitHubPackageFetcher implements PackageFetcher
      */
     private function fetchDevVersion(PendingRequest $client, string $owner, string $repo, string $manifestFile): ?array
     {
-        $response = $client->get("/repos/{$owner}/{$repo}");
+        $defaultBranch = $this->fetchDefaultBranch($client, $owner, $repo);
 
-        if (! $response->successful()) {
+        if ($defaultBranch === null) {
             return null;
         }
-
-        $defaultBranch = $response->json('default_branch', 'main');
 
         $branchResponse = $client->get("/repos/{$owner}/{$repo}/branches/{$defaultBranch}");
 

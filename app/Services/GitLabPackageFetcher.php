@@ -15,7 +15,7 @@ class GitLabPackageFetcher implements PackageFetcher
     {
         $projectPath = $this->parseProjectPath($package->repository_url);
         $client = $this->buildClient($package);
-        $manifestFile = $package->ecosystem->manifestFile();
+        $manifestFile = $package->manifestPath();
         $versions = [];
 
         $tags = $this->fetchAllTags($client, $projectPath);
@@ -50,6 +50,20 @@ class GitLabPackageFetcher implements PackageFetcher
         }
 
         return $versions;
+    }
+
+    public function fetchDefaultBranchManifest(Package $package): ?array
+    {
+        $projectPath = $this->parseProjectPath($package->repository_url);
+        $client = $this->buildClient($package);
+
+        $defaultBranch = $this->fetchDefaultBranch($client, $projectPath);
+
+        if ($defaultBranch === null) {
+            return null;
+        }
+
+        return $this->fetchManifest($client, $projectPath, $defaultBranch, $package->manifestPath());
     }
 
     public function getDistArchive(Package $package, string $reference): mixed
@@ -136,6 +150,17 @@ class GitLabPackageFetcher implements PackageFetcher
         return $tags;
     }
 
+    private function fetchDefaultBranch(PendingRequest $client, string $projectPath): ?string
+    {
+        $response = $client->get('/api/v4/projects/'.urlencode($projectPath));
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        return $response->json('default_branch', 'main');
+    }
+
     /**
      * @return array<string, mixed>|null
      */
@@ -143,7 +168,7 @@ class GitLabPackageFetcher implements PackageFetcher
     {
         $encodedPath = urlencode($projectPath);
 
-        $response = $client->get("/api/v4/projects/{$encodedPath}/repository/files/{$file}/raw", [
+        $response = $client->get("/api/v4/projects/{$encodedPath}/repository/files/".rawurlencode($file).'/raw', [
             'ref' => $ref,
         ]);
 
@@ -162,14 +187,11 @@ class GitLabPackageFetcher implements PackageFetcher
     private function fetchDevVersion(PendingRequest $client, string $projectPath, string $manifestFile): ?array
     {
         $encodedPath = urlencode($projectPath);
+        $defaultBranch = $this->fetchDefaultBranch($client, $projectPath);
 
-        $response = $client->get("/api/v4/projects/{$encodedPath}");
-
-        if (! $response->successful()) {
+        if ($defaultBranch === null) {
             return null;
         }
-
-        $defaultBranch = $response->json('default_branch', 'main');
 
         $branchResponse = $client->get("/api/v4/projects/{$encodedPath}/repository/branches/{$defaultBranch}");
 

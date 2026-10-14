@@ -59,12 +59,14 @@ class NpmTarballBuilder
     ];
 
     /**
+     * @param  string|null  $subdirectory  Path of the package inside the repository, for monorepos.
      * @return array{contents: string, shasum: string, integrity: string, manifest: array<string, mixed>}
      */
-    public function build(string $zipArchive, string $packageName, string $version): array
+    public function build(string $zipArchive, string $packageName, string $version, ?string $subdirectory = null): array
     {
         $entries = $this->readZip($zipArchive);
-        $prefix = $this->detectPrefix($entries);
+        $packageRoot = $subdirectory ? trim($subdirectory, '/').'/' : '';
+        $prefix = $this->detectPrefix($entries, $packageRoot).$packageRoot;
 
         $files = [];
         foreach ($entries as $name => $entry) {
@@ -82,7 +84,7 @@ class NpmTarballBuilder
         }
 
         if (! isset($files['package.json'])) {
-            throw new RuntimeException('package.json not found at the root of the archive.');
+            throw new RuntimeException($this->missingManifestMessage($packageRoot));
         }
 
         $manifest = json_decode($files['package.json']['contents'], true);
@@ -93,7 +95,7 @@ class NpmTarballBuilder
 
         $manifestName = $manifest['name'] ?? null;
 
-        if ($manifestName !== $packageName) {
+        if (! is_string($manifestName) || strtolower($manifestName) !== $packageName) {
             throw new RuntimeException(sprintf(
                 'package.json name "%s" does not match the package name "%s".',
                 is_string($manifestName) ? $manifestName : '(missing)',
@@ -101,6 +103,7 @@ class NpmTarballBuilder
             ));
         }
 
+        $manifest['name'] = $packageName;
         $manifest['version'] = $version;
 
         $files['package.json']['contents'] = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)."\n";
@@ -179,13 +182,14 @@ class NpmTarballBuilder
 
     /**
      * GitHub and GitLab archives wrap the tree in a single top-level folder,
-     * `git archive` does not. Return the folder to strip, if any.
+     * `git archive` does not. Return the folder to strip, if any, given the
+     * package root inside the repository ("" or "packages/ui/").
      *
      * @param  array<string, array{contents: string, mode: int}>  $entries
      */
-    private function detectPrefix(array $entries): string
+    private function detectPrefix(array $entries, string $packageRoot): string
     {
-        if (isset($entries['package.json'])) {
+        if (isset($entries[$packageRoot.'package.json'])) {
             return '';
         }
 
@@ -197,12 +201,19 @@ class NpmTarballBuilder
         if (count($topLevel) === 1) {
             $prefix = array_key_first($topLevel).'/';
 
-            if (isset($entries[$prefix.'package.json'])) {
+            if (isset($entries[$prefix.$packageRoot.'package.json'])) {
                 return $prefix;
             }
         }
 
-        throw new RuntimeException('package.json not found at the root of the archive.');
+        throw new RuntimeException($this->missingManifestMessage($packageRoot));
+    }
+
+    private function missingManifestMessage(string $packageRoot): string
+    {
+        return $packageRoot === ''
+            ? 'package.json not found at the root of the archive.'
+            : sprintf('package.json not found in "%s" inside the archive.', rtrim($packageRoot, '/'));
     }
 
     /**

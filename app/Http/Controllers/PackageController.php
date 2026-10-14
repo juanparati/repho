@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Ecosystem;
+use App\Enums\PackageType;
 use App\Http\Requests\StorePackageRequest;
 use App\Http\Requests\UpdatePackageRequest;
 use App\Jobs\SyncPackage;
@@ -12,6 +13,7 @@ use App\Models\Package;
 use App\Models\Repository;
 use App\Models\Version;
 use App\Services\DistStorage;
+use App\Services\NpmPackageNameResolver;
 use App\Services\NpmSemver;
 use App\Services\SecurityAdvisoryChecker;
 use Illuminate\Http\RedirectResponse;
@@ -59,16 +61,29 @@ class PackageController extends Controller
         ]);
     }
 
-    public function store(StorePackageRequest $request, SecurityAdvisoryChecker $advisoryChecker): RedirectResponse
+    public function store(StorePackageRequest $request, SecurityAdvisoryChecker $advisoryChecker, NpmPackageNameResolver $nameResolver): RedirectResponse
     {
         $validated = $request->validated();
         $repositoryIds = $validated['repository_ids'] ?? [];
         unset($validated['repository_ids']);
 
         $ecosystem = Ecosystem::from($validated['ecosystem']);
-        $packageName = $ecosystem === Ecosystem::Npm
-            ? $validated['name']
-            : $this->guessPackageName($validated['repository_url']);
+
+        try {
+            $packageName = match (true) {
+                $ecosystem !== Ecosystem::Npm => $this->guessPackageName($validated['repository_url']),
+                filled($validated['name'] ?? null) => $validated['name'],
+                default => $nameResolver->resolve(
+                    PackageType::from($validated['type']),
+                    $validated['repository_url'],
+                    $validated['credential_id'] ?? null,
+                    $validated['subdirectory'] ?? null,
+                ),
+            };
+        } catch (\RuntimeException $e) {
+            return redirect()->route('packages.create')
+                ->withErrors(['name' => $e->getMessage()]);
+        }
 
         $advisories = $advisoryChecker->check($packageName, $ecosystem);
 
@@ -113,6 +128,7 @@ class PackageController extends Controller
                 'name' => $package->name,
                 'ecosystem' => $package->ecosystem->value,
                 'repository_url' => $package->repository_url,
+                'subdirectory' => $package->subdirectory,
                 'type' => $package->type->value,
                 'download_dists' => $package->download_dists,
                 'description' => $package->description,

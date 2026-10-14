@@ -82,13 +82,14 @@ export default function PackagesCreate({
                                     <Input
                                         id="name"
                                         name="name"
-                                        placeholder="@scope/package"
-                                        required
+                                        placeholder="@scope/package (optional)"
                                     />
                                     <p className="text-xs text-muted-foreground">
-                                        Must match the <code>name</code> in the
-                                        repository&apos;s package.json. The
-                                        first sync fails if it differs.
+                                        Leave blank to read it from the
+                                        repository&apos;s package.json on the
+                                        default branch. If you enter one, it
+                                        must match that name or the first sync
+                                        fails.
                                     </p>
                                     <InputError message={errors.name} />
                                 </div>
@@ -107,6 +108,26 @@ export default function PackagesCreate({
                                 />
                                 <InputError message={errors.repository_url} />
                             </div>
+
+                            {ecosystem === 'npm' && (
+                                <div className="grid gap-2">
+                                    <Label htmlFor="subdirectory">
+                                        Subdirectory
+                                    </Label>
+                                    <Input
+                                        id="subdirectory"
+                                        name="subdirectory"
+                                        placeholder="packages/my-package (optional)"
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        For monorepos: the folder inside the
+                                        repository that holds the package.json
+                                        to publish. Leave blank when it is at
+                                        the repository root.
+                                    </p>
+                                    <InputError message={errors.subdirectory} />
+                                </div>
+                            )}
 
                             <div className="grid gap-2">
                                 <Label htmlFor="type">Source Type</Label>

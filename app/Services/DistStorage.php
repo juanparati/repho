@@ -70,7 +70,7 @@ class DistStorage
         $contents = is_resource($archive) ? (string) stream_get_contents($archive) : (string) $archive;
 
         if ($package->isNpm()) {
-            $built = $this->tarballBuilder->build($contents, $package->name, $version->version);
+            $built = $this->tarballBuilder->build($contents, $package->name, $version->version, $package->subdirectory);
             $contents = $built['contents'];
         }
 

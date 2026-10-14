@@ -16,6 +16,16 @@ interface PackageFetcher
     public function fetchVersions(Package $package): array;
 
     /**
+     * Read the ecosystem's manifest (composer.json or package.json) from the
+     * repository's default branch. Works for an unsaved package, so it can be
+     * used before the package is created. Returns null when the branch or the
+     * file cannot be read or is not valid JSON.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function fetchDefaultBranchManifest(Package $package): ?array;
+
+    /**
      * Get the raw Git archive (zip) for a specific version.
      *
      * @return resource|string|null

@@ -56,6 +56,58 @@ class SyncPackagesCommandTest extends TestCase
         ]);
     }
 
+    public function test_add_command_reads_npm_name_from_package_json_when_name_is_omitted(): void
+    {
+        $this->mock(PackageSynchronizer::class, function ($mock) {
+            $mock->shouldReceive('sync')->once();
+        });
+        Http::fake([
+            'api.github.com/repos/vendor/pkg' => Http::response(['default_branch' => 'main']),
+            'api.github.com/repos/vendor/pkg/contents/package.json*' => Http::response([
+                'content' => base64_encode(json_encode(['name' => '@Vendor/Pkg', 'version' => '1.0.0'])),
+            ]),
+        ]);
+
+        $this->artisan('package:add', ['url' => 'https://github.com/vendor/pkg', '--ecosystem' => 'npm'])
+            ->assertExitCode(0);
+
+        $this->assertDatabaseHas('packages', ['name' => '@vendor/pkg', 'ecosystem' => 'npm']);
+    }
+
+    public function test_add_command_reads_npm_name_from_the_given_subdirectory(): void
+    {
+        $this->mock(PackageSynchronizer::class, function ($mock) {
+            $mock->shouldReceive('sync')->once();
+        });
+        Http::fake([
+            'api.github.com/repos/vendor/pkg' => Http::response(['default_branch' => 'main']),
+            'api.github.com/repos/vendor/pkg/contents/packages/ui/package.json*' => Http::response([
+                'content' => base64_encode(json_encode(['name' => '@vendor/ui'])),
+            ]),
+        ]);
+
+        $this->artisan('package:add', ['url' => 'https://github.com/vendor/pkg', '--ecosystem' => 'npm', '--path' => 'packages/ui'])
+            ->assertExitCode(0);
+
+        $this->assertDatabaseHas('packages', ['name' => '@vendor/ui', 'ecosystem' => 'npm', 'subdirectory' => 'packages/ui']);
+    }
+
+    public function test_add_command_fails_when_npm_name_cannot_be_read_from_package_json(): void
+    {
+        $this->mock(PackageSynchronizer::class, function ($mock) {
+            $mock->shouldNotReceive('sync');
+        });
+        Http::fake([
+            'api.github.com/repos/vendor/pkg' => Http::response(['default_branch' => 'main']),
+            'api.github.com/repos/vendor/pkg/contents/*' => Http::response(null, 404),
+        ]);
+
+        $this->artisan('package:add', ['url' => 'https://github.com/vendor/pkg', '--ecosystem' => 'npm'])
+            ->assertExitCode(1);
+
+        $this->assertDatabaseCount('packages', 0);
+    }
+
     public function test_add_command_detects_gitlab_type(): void
     {
         $this->mock(PackageSynchronizer::class, function ($mock) {

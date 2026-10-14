@@ -173,6 +173,11 @@ export default function PackagesShow({
                             {pkg.repository_url}
                         </a>
                     </InfoCard>
+                    {pkg.subdirectory && (
+                        <InfoCard label="Subdirectory">
+                            <code className="text-sm">{pkg.subdirectory}</code>
+                        </InfoCard>
+                    )}
                     <InfoCard label="Last Synced">
                         <span className="text-sm">
                             {pkg.last_synced_at ?? 'Never'}

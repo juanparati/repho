@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Concerns\NormalizesTagVersions;
 use App\Models\Package;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Str;
 
 class GitPackageFetcher implements PackageFetcher
 {
@@ -13,7 +15,7 @@ class GitPackageFetcher implements PackageFetcher
     public function fetchVersions(Package $package): array
     {
         $repoPath = $this->ensureCloned($package);
-        $manifestFile = $package->ecosystem->manifestFile();
+        $manifestFile = $package->manifestPath();
         $versions = [];
 
         $tagsResult = Process::path($repoPath)->run('git tag');
@@ -58,6 +60,32 @@ class GitPackageFetcher implements PackageFetcher
         }
 
         return $versions;
+    }
+
+    /**
+     * The persistent clone is keyed by the package id, which an unsaved
+     * package does not have yet, so this uses a throwaway shallow clone.
+     */
+    public function fetchDefaultBranchManifest(Package $package): ?array
+    {
+        $tempPath = config('repho.git_clone_path').'/tmp-'.Str::uuid();
+
+        $parentDir = dirname($tempPath);
+        if (! is_dir($parentDir)) {
+            mkdir($parentDir, 0755, true);
+        }
+
+        try {
+            $result = Process::run($this->gitCommand($package, ['clone', '--bare', '--depth', '1', '--', $package->repository_url, $tempPath]));
+
+            if (! $result->successful()) {
+                return null;
+            }
+
+            return $this->readManifest($tempPath, 'HEAD', $package->manifestPath());
+        } finally {
+            File::deleteDirectory($tempPath);
+        }
     }
 
     public function getDistArchive(Package $package, string $reference): mixed

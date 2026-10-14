@@ -62,6 +62,21 @@ class NpmTarballBuilderTest extends TestCase
         $this->assertSame('index.js', $manifest['main']);
     }
 
+    public function test_accepts_legacy_uppercase_manifest_name_and_normalizes_it(): void
+    {
+        $zip = $this->makeZipArchive([
+            'package.json' => json_encode(['name' => 'MD5', 'version' => '1.2.2']),
+            'md5.js' => '',
+        ]);
+
+        $result = $this->builder->build($zip, 'md5', '1.2.2');
+        $entries = $this->readTarball($result['contents']);
+        $manifest = json_decode($entries['package/package.json'], true);
+
+        $this->assertSame('md5', $manifest['name']);
+        $this->assertSame('md5', $result['manifest']['name']);
+    }
+
     public function test_rejects_manifest_with_different_name(): void
     {
         $zip = $this->makeZipArchive([
@@ -72,6 +87,38 @@ class NpmTarballBuilderTest extends TestCase
         $this->expectExceptionMessage('package.json name "@acme/other" does not match the package name "@acme/ui"');
 
         $this->builder->build($zip, '@acme/ui', '1.0.0');
+    }
+
+    public function test_builds_tarball_from_a_subdirectory_of_a_monorepo(): void
+    {
+        $zip = $this->makeZipArchive([
+            'package.json' => json_encode(['name' => '@acme/monorepo', 'private' => true]),
+            'packages/ui/package.json' => json_encode(['name' => '@acme/ui', 'version' => '0.0.0']),
+            'packages/ui/index.js' => 'ui',
+            'packages/ui/.npmignore' => 'scratch/',
+            'packages/ui/scratch/notes.txt' => 'skip',
+            'packages/core/index.js' => 'core',
+        ], 'acme-monorepo-abc123/');
+
+        $result = $this->builder->build($zip, '@acme/ui', '1.2.3', 'packages/ui');
+        $entries = $this->readTarball($result['contents']);
+
+        $this->assertSame(['package/index.js', 'package/package.json'], array_keys($entries));
+        $this->assertSame('ui', $entries['package/index.js']);
+        $this->assertSame('@acme/ui', $result['manifest']['name']);
+    }
+
+    public function test_rejects_subdirectory_without_package_json(): void
+    {
+        $zip = $this->makeZipArchive([
+            'package.json' => json_encode(['name' => '@acme/monorepo']),
+            'packages/core/index.js' => '',
+        ], 'acme-monorepo-abc123/');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('package.json not found in "packages/ui" inside the archive.');
+
+        $this->builder->build($zip, '@acme/ui', '1.0.0', 'packages/ui');
     }
 
     public function test_rejects_archive_without_package_json(): void

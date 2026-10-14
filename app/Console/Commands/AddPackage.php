@@ -7,16 +7,17 @@ use App\Enums\PackageType;
 use App\Models\Credential;
 use App\Models\Package;
 use App\Models\Repository;
+use App\Services\NpmPackageNameResolver;
 use App\Services\PackageSynchronizer;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
-#[Signature('package:add {url : Repository URL} {--type= : Source type (github, gitlab, git)} {--ecosystem=composer : Package ecosystem (composer, npm)} {--name= : Package name, required for npm (as declared in package.json)} {--credential= : Credential name or ID} {--repo=* : Repository slug(s) to add the package to}')]
+#[Signature('package:add {url : Repository URL} {--type= : Source type (github, gitlab, git)} {--ecosystem=composer : Package ecosystem (composer, npm)} {--name= : Package name; for npm, read from package.json on the default branch when omitted} {--path= : Subdirectory of the repository that holds the npm package (monorepos)} {--credential= : Credential name or ID} {--repo=* : Repository slug(s) to add the package to}')]
 #[Description('Add a new package from a repository URL')]
 class AddPackage extends Command
 {
-    public function handle(PackageSynchronizer $synchronizer): int
+    public function handle(PackageSynchronizer $synchronizer, NpmPackageNameResolver $nameResolver): int
     {
         $url = $this->argument('url');
         $type = $this->resolveType($url);
@@ -35,20 +36,42 @@ class AddPackage extends Command
             return self::FAILURE;
         }
 
-        $name = $ecosystem === Ecosystem::Npm ? (string) $this->option('name') : $this->guessPackageName($url);
+        $credential = $this->resolveCredential();
+        $subdirectory = trim((string) $this->option('path'), " \t/") ?: null;
 
-        if ($ecosystem === Ecosystem::Npm && preg_match('/^'.Package::NPM_NAME_PATTERN.'$/', $name) !== 1) {
-            $this->error('npm packages need a valid --name, e.g. --name=@scope/package.');
+        if ($subdirectory !== null && preg_match('#^'.Package::SUBDIRECTORY_PATTERN.'$#', $subdirectory) !== 1) {
+            $this->error('Invalid --path; expected a relative path inside the repository, e.g. --path=packages/my-package.');
 
             return self::FAILURE;
         }
 
-        $credential = $this->resolveCredential();
+        if ($ecosystem === Ecosystem::Npm) {
+            $name = (string) $this->option('name');
+
+            if ($name === '') {
+                try {
+                    $name = $nameResolver->resolve($type, $url, $credential?->id, $subdirectory);
+                } catch (\RuntimeException $e) {
+                    $this->error($e->getMessage());
+
+                    return self::FAILURE;
+                }
+
+                $this->info("Package name read from package.json: {$name}");
+            } elseif (preg_match('/^'.Package::NPM_NAME_PATTERN.'$/', $name) !== 1) {
+                $this->error('Invalid --name for an npm package, e.g. --name=@scope/package.');
+
+                return self::FAILURE;
+            }
+        } else {
+            $name = $this->guessPackageName($url);
+        }
 
         $package = Package::create([
             'name' => $name,
             'ecosystem' => $ecosystem,
             'repository_url' => $url,
+            'subdirectory' => $ecosystem === Ecosystem::Npm ? $subdirectory : null,
             'type' => $type,
             'credential_id' => $credential?->id,
         ]);

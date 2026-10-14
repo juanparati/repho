@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'ecosystem', 'repository_url', 'type', 'credential_id', 'download_dists', 'description', 'last_synced_at', 'sync_error', 'is_syncing', 'sync_progress'])]
+#[Fillable(['name', 'ecosystem', 'repository_url', 'subdirectory', 'type', 'credential_id', 'download_dists', 'description', 'last_synced_at', 'sync_error', 'is_syncing', 'sync_progress'])]
 class Package extends Model
 {
     /** @use HasFactory<PackageFactory> */
@@ -23,6 +23,23 @@ class Package extends Model
      * never starting with a dot, underscore or dash.
      */
     public const string NPM_NAME_PATTERN = '(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*';
+
+    /**
+     * Valid subdirectory inside the repository: slash-separated segments of
+     * safe characters, no leading or trailing slash, no "." or ".." segments.
+     */
+    public const string SUBDIRECTORY_PATTERN = '(?!\.+(\/|$))[A-Za-z0-9._-]+(\/(?!\.+(\/|$))[A-Za-z0-9._-]+)*';
+
+    /**
+     * Path of the ecosystem manifest relative to the repository root, taking
+     * the package's subdirectory into account (e.g. "packages/ui/package.json").
+     */
+    public function manifestPath(): string
+    {
+        $file = $this->ecosystem->manifestFile();
+
+        return $this->subdirectory ? $this->subdirectory.'/'.$file : $file;
+    }
 
     /**
      * @return array<string, string>

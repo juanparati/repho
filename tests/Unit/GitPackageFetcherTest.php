@@ -84,6 +84,40 @@ class GitPackageFetcherTest extends TestCase
         });
     }
 
+    public function test_default_branch_manifest_uses_a_temporary_shallow_clone(): void
+    {
+        Process::fake([
+            '*git*show*HEAD:package.json*' => Process::result(json_encode(['name' => '@acme/ui'])),
+            '*' => Process::result(''),
+        ]);
+
+        $credential = Credential::factory()->git()->create(['token' => 'secret-token']);
+        $package = new Package([
+            'ecosystem' => 'npm',
+            'type' => 'git',
+            'repository_url' => 'https://git.example.com/vendor/pkg.git',
+            'credential_id' => $credential->id,
+        ]);
+
+        $manifest = (new GitPackageFetcher)->fetchDefaultBranchManifest($package);
+
+        $this->assertSame(['name' => '@acme/ui'], $manifest);
+
+        $expectedHeader = 'http.extraHeader=Authorization: Basic '.base64_encode('oauth2:secret-token');
+
+        Process::assertRan(function (PendingProcess $process) use ($expectedHeader) {
+            $command = $process->command;
+
+            return is_array($command)
+                && in_array('clone', $command, true)
+                && in_array('--depth', $command, true)
+                && in_array($expectedHeader, $command, true)
+                && str_starts_with(end($command), $this->clonePath.'/tmp-');
+        });
+
+        $this->assertSame([], File::directories($this->clonePath));
+    }
+
     public function test_clone_without_credential_omits_auth_header(): void
     {
         Process::fake();

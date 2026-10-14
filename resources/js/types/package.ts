@@ -10,6 +10,7 @@ export type Package = {
     name: string;
     ecosystem: Ecosystem;
     repository_url: string;
+    subdirectory?: string | null;
     type: 'github' | 'gitlab' | 'git';
     download_dists: boolean;
     description: string | null;

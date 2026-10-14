@@ -59,6 +59,8 @@ class PackageSynchronizer
     /**
      * The npm client requests metadata by the exact name in package.json, so
      * a package whose manifest carries a different name would never resolve.
+     * The comparison ignores case because tags published before npm enforced
+     * lowercase names (e.g. "MD5" for md5@1.x) still carry the old spelling.
      *
      * @param  array<int, array{version: string, version_normalized: string, reference: string, manifest: array<string, mixed>, released_at: string|null}>  $versions
      */
@@ -67,7 +69,7 @@ class PackageSynchronizer
         foreach ($versions as $version) {
             $manifestName = $version['manifest']['name'] ?? null;
 
-            if ($manifestName !== $package->name) {
+            if (! is_string($manifestName) || strtolower($manifestName) !== $package->name) {
                 throw new \RuntimeException(sprintf(
                     'package.json at tag %s declares the name "%s", but this package is registered as "%s".',
                     $version['version'],
