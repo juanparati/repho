@@ -14,7 +14,9 @@ return new class extends Migration
             $table->string('version');
             $table->string('version_normalized');
             $table->string('reference');
-            $table->json('composer_json');
+            $table->string('shasum', 40)->nullable();
+            $table->string('integrity')->nullable();
+            $table->json('manifest');
             $table->timestamp('released_at')->nullable();
             $table->timestamps();
 
